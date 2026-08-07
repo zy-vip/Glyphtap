@@ -290,7 +290,7 @@ public sealed class ScreenLayout
         foreach (var m in monitors)
             union.Union(m.Bounds);
 
-        var primary = monitors.First(m => m.IsPrimary) ?? monitors[0];
+        var primary = monitors.FirstOrDefault(m => m.IsPrimary) ?? monitors[0];
         return new ScreenLayout(monitors, union, primary);
     }
 
@@ -1037,13 +1037,25 @@ public sealed class PenAnnotation : Annotation
     public List<Point> Points = new();
     public PenAnnotation() { Kind = AnnotationKind.Pen; }
     public void AddPoint(Point p) => Points.Add(p);
-    public override Rect Bounds { get; } = Rect.Empty;
+    public override Rect Bounds
+    {
+        get
+        {
+            if (Points.Count == 0)
+                return Rect.Empty;
+            var minX = Points.Min(p => p.X);
+            var minY = Points.Min(p => p.Y);
+            var maxX = Points.Max(p => p.X);
+            var maxY = Points.Max(p => p.Y);
+            return new Rect(minX, minY, maxX - minX, maxY - minY);
+        }
+    }
     public override void Offset(Vector delta) { for (var i = 0; i < Points.Count; i++) Points[i] += delta; }
     public override void Resize(Rect newBounds) { /* 画笔 MVP 不缩放 */ }
 }
 ```
 
-> 注意：`ArrowAnnotation.Resize` 与 `PenAnnotation.Resize` 不实现缩放（MVP 中标注存选区相对坐标，选区移动时天然跟随；选区缩放时标注不缩放，合成裁剪由 `PushClip` 完成）。`PenAnnotation.Bounds` 若影响选中测试则实现为点集包围盒。
+> 注意：`ArrowAnnotation.Resize` 与 `PenAnnotation.Resize` 不实现缩放（MVP 中标注存选区相对坐标，选区移动时天然跟随；选区缩放时标注不缩放，合成裁剪由 `PushClip` 完成）。`PenAnnotation.Bounds` 实现为点集包围盒。
 
 `src/Glyphtap/Capture/AnnotationManager.cs`：
 
@@ -1296,9 +1308,11 @@ namespace Glyphtap.Capture;
 /// <summary>标注工具：一次拖拽的交互协议，产出 Annotation（null 表示放弃）。坐标相对选区。</summary>
 public interface IAnnotationTool
 {
+    AnnotationKind Kind { get; }
     bool IsDrawing { get; }
     void Begin(Point p);
     void Move(Point p);
+    Annotation? GetPreview();
     Annotation? End();
 }
 
@@ -1727,18 +1741,23 @@ public class ComposerAndClipboardTests
     public void Compose_超界标注被裁剪()
     {
         var full = Solid(Colors.White, 100, 100);
-        // 标注从选区外 (90,90) 到选区外 (150,150)，选区内 (95..100) 可见部分应被裁掉
+        // 画笔从选区内 (90,90) 延伸到选区外 (150,150)：选区内的部分 (90,90)-(100,100) 应可见
         var pen = new PenAnnotation { Color = Colors.Black, Thickness = 4 };
         pen.AddPoint(new Point(90, 90));
         pen.AddPoint(new Point(150, 150));
         var result = CaptureComposer.Compose(full, new Rect(0, 0, 100, 100), new Annotation[] { pen });
         var pixels = new byte[100 * 100 * 4];
         result.CopyPixels(pixels, 100 * 4, 0);
-        // 选区右下角 (98,98) 应为白色背景，而非黑色笔迹
-        var idx = (98 * 100 + 98) * 4;
-        Assert.Equal(255, pixels[idx]);
-        Assert.Equal(255, pixels[idx + 1]);
-        Assert.Equal(255, pixels[idx + 2]);
+        // 对角线上、位于选区内/裁剪区内的 (95,95) 应见黑色笔迹
+        var idx = (95 * 100 + 95) * 4;
+        Assert.Equal(0, pixels[idx]);
+        Assert.Equal(0, pixels[idx + 1]);
+        Assert.Equal(0, pixels[idx + 2]);
+        // 远离线段 (10,0) 处为白色背景
+        var far = (0 * 100 + 10) * 4;
+        Assert.Equal(255, pixels[far]);
+        Assert.Equal(255, pixels[far + 1]);
+        Assert.Equal(255, pixels[far + 2]);
     }
 
     [StaFact]
@@ -1844,6 +1863,9 @@ public static class CaptureComposer
 
         using (var dc = dv.RenderOpen())
         {
+            // 先裁剪到选区矩形，再绘制背景与标注，超界内容不显示
+            dc.PushClip(new RectangleGeometry(new Rect(0, 0, w, h)));
+
             // 背景：把整图平移到选区对齐（选区左上角 → 0,0）
             dc.DrawImage(fullScreen, new Rect(
                 -(selectionPhysical.X),
@@ -1851,15 +1873,10 @@ public static class CaptureComposer
                 fullScreen.PixelWidth,
                 fullScreen.PixelHeight));
 
-            // 标注（相对选区坐标）
+            // 标注（相对选区坐标），超界部分被 PushClip 裁掉
             foreach (var a in annotations)
                 AnnotationRenderer.Draw(dc, a);
 
-            // 裁剪到选区：超界标注不显示
-            var clip = new RectangleGeometry(new Rect(0, 0, w, h));
-            dc.PushClip(clip);
-            foreach (var a in annotations)
-                AnnotationRenderer.Draw(dc, a);
             dc.Pop();
         }
 
@@ -1867,21 +1884,6 @@ public static class CaptureComposer
         return rtb;
     }
 }
-```
-
-> 修正：上面实现中标注重复绘制两遍是错误的。正确做法——先 `PushClip(选区矩形)` 再画背景与标注，最后 `Pop()`：
-
-```csharp
-        using (var dc = dv.RenderOpen())
-        {
-            dc.PushClip(new RectangleGeometry(new Rect(0, 0, w, h)));
-            dc.DrawImage(fullScreen, new Rect(
-                -(selectionPhysical.X), -(selectionPhysical.Y),
-                fullScreen.PixelWidth, fullScreen.PixelHeight));
-            foreach (var a in annotations)
-                AnnotationRenderer.Draw(dc, a);
-            dc.Pop();
-        }
 ```
 
 `src/Glyphtap/Services/BitmapConvert.cs`：
@@ -1991,7 +1993,7 @@ git commit -m "feat: 标注渲染/截图合成/剪贴板服务"
         WindowStyle="None" ResizeMode="NoResize" ShowInTaskbar="False"
         Topmost="True" Background="Black" Focusable="True">
     <Grid x:Name="RootGrid">
-        <Image x:Name="BackgroundImage" Stretch="None" Opacity="0.35" IsHitTestVisible="False" />
+        <Image x:Name="BackgroundImage" Stretch="Fill" Opacity="0.35" IsHitTestVisible="False" />
         <Canvas x:Name="OverlayCanvas" />
         <Canvas x:Name="AnnotationCanvas" IsHitTestVisible="False" />
     </Grid>
@@ -2653,7 +2655,7 @@ git commit -m "feat: 标注交互与工具栏（绘制/选中/清除/合成含�
 - Produces:
   - `public sealed class HotKeyService : IDisposable { public event Action? HotKeyPressed; public bool IsRegistered { get; } public static HotKeyService Register(nint hwnd, uint modifier, uint key); }`
   - `public sealed class TrayIconService : IDisposable { public void ShowNotification(string title, string message); }`
-  - `public sealed class CaptureController { public static CaptureController Instance { get; } public void StartCapture(); public bool IsCapturing { get; } }`
+  - `public sealed class CaptureController { public CaptureController(Action<string, string> notify); public void StartCapture(); public bool IsCapturing { get; } }`
   - `public static class SingleInstance { public static bool TryAcquire(string name, out IDisposable? guard); }`
   - `public interface ITextRecognizer { Task<IReadOnlyList<TextLine>> RecognizeAsync(BitmapSource image, CancellationToken ct); }` + `public sealed record TextLine(string Text, Rect BoundsDips);`（V2 实现，本版仅定义）
 
