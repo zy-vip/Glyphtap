@@ -2009,6 +2009,7 @@ git commit -m "feat: 标注渲染/截图合成/剪贴板服务"
 
 ```csharp
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -2024,7 +2025,7 @@ public sealed partial class CaptureWindow : Window
     private readonly Action _onCancel;
     private readonly SelectionLogic _selection = new();
     private readonly List<System.Windows.Shapes.Rectangle> _maskParts = new();
-    private readonly System.Windows.Shapes.Rectangle _selectionVisual;
+    private System.Windows.Shapes.Rectangle _selectionVisual = null!;
     private readonly List<System.Windows.Shapes.Rectangle> _handles = new();
 
     public bool IsOpen { get; private set; } = true;
