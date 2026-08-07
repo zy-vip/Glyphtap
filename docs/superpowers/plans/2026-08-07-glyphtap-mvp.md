@@ -1547,7 +1547,7 @@ public class ScreenCaptureServiceTests
         using var result = ScreenCaptureService.Stitch(
             new[] { (new Rect(0, 0, 10, 10), red) },
             new Rect(0, 0, 20, 20));
-        Assert.Equal(Color.Transparent.ToArgb(), result.GetPixel(15, 15).ToArgb());
+        Assert.Equal(0, result.GetPixel(15, 15).A); // GDI+ 透明填充为 alpha=0，不比较 Color.Transparent 的 RGB 常量
     }
 }
 ```
@@ -1597,7 +1597,7 @@ public static class ScreenCaptureService
                 var bmp = new Bitmap((int)b.Width, (int)b.Height, PixelFormat.Format32bppArgb);
                 using (var g = Graphics.FromImage(bmp))
                 {
-                    g.CopyFromScreen((int)b.X, (int)b.Y, 0, 0, new Size((int)b.Width, (int)b.Height));
+                    g.CopyFromScreen((int)b.X, (int)b.Y, 0, 0, new System.Drawing.Size((int)b.Width, (int)b.Height));
                 }
                 parts.Add((new Rect(b.X, b.Y, b.Width, b.Height), bmp));
             }
