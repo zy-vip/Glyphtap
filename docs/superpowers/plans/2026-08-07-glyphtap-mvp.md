@@ -738,8 +738,9 @@ public sealed class SelectionLogic
 
             case SelectionMode.Moving:
                 var delta = p - _down;
-                Selection = _startRect;
-                Selection.Offset(delta);
+                var moved = _startRect;
+                moved.Offset(delta);
+                Selection = moved;
                 break;
 
             case SelectionMode.Resizing:
@@ -809,35 +810,38 @@ public sealed class SelectionLogic
         return ResizeHandle.None;
     }
 
-    /// <summary>按手柄缩放：固定对边（start 内边坐标），动边跟随指针，允许反向（自动归一化）。</summary>
+    /// <summary>
+    /// 按手柄缩放：固定对边（start 内边坐标），动边跟随指针，允许反向（自动归一化）。
+    /// 注：WPF Rect 不允许负宽高，故改用动边/定边取 min/max 构造（等价于归一化后构造）。
+    /// </summary>
     private static Rect ResizeTo(ResizeHandle handle, Rect start, Point p)
     {
+        var left = start.Left;
+        var top = start.Top;
+        var right = start.Right;
+        var bottom = start.Bottom;
+
         switch (handle)
         {
-            case ResizeHandle.Top:
-                return new Rect(p.X, p.Y, start.Width, start.Bottom - p.Y);
-            case ResizeHandle.Bottom:
-                return new Rect(start.X, start.Y, start.Width, p.Y - start.Y);
-            case ResizeHandle.Left:
-                return new Rect(p.X, start.Y, start.Right - p.X, start.Height);
-            case ResizeHandle.Right:
-                return new Rect(start.X, start.Y, p.X - start.X, start.Height);
-            case ResizeHandle.TopLeft:
-                return new Rect(p.X, p.Y, start.Right - p.X, start.Bottom - p.Y);
-            case ResizeHandle.TopRight:
-                return new Rect(start.X, p.Y, p.X - start.X, start.Bottom - p.Y);
-            case ResizeHandle.BottomLeft:
-                return new Rect(p.X, start.Y, start.Right - p.X, p.Y - start.Y);
-            case ResizeHandle.BottomRight:
-                return new Rect(start.X, start.Y, p.X - start.X, p.Y - start.Y);
-            default:
-                return start;
+            case ResizeHandle.Top: top = p.Y; break;
+            case ResizeHandle.Bottom: bottom = p.Y; break;
+            case ResizeHandle.Left: left = p.X; break;
+            case ResizeHandle.Right: right = p.X; break;
+            case ResizeHandle.TopLeft: left = p.X; top = p.Y; break;
+            case ResizeHandle.TopRight: right = p.X; top = p.Y; break;
+            case ResizeHandle.BottomLeft: left = p.X; bottom = p.Y; break;
+            case ResizeHandle.BottomRight: right = p.X; bottom = p.Y; break;
+            default: return start;
         }
+
+        return new Rect(
+            new Point(Math.Min(left, right), Math.Min(top, bottom)),
+            new Point(Math.Max(left, right), Math.Max(top, bottom)));
     }
 }
 ```
 
-> 说明：`Normalize` 会将反向拖动的矩形修正方向；对于已归一化选区上的手柄缩放（如 Top 手柄），`Normalize(ResizeTo(...))` 保证 `p` 越过对边时选区方向正确。测试中的预期值已验证此行为。
+> 说明：`Normalize` 会将反向拖动修正方向；`ResizeTo` 内部已按 min/max 归一化构造（规避 WPF 不允许负宽高的限制），`OnMouseMove` 中 `Normalize(ResizeTo(...))` 幂等无害。移动模式下需用局部变量 `moved.Offset(delta)` 后赋值回 `Selection`（结构体属性原地 Offset 无效）。测试中的预期值已验证此行为。
 
 - [ ] **Step 4: 运行测试确认通过**
 
