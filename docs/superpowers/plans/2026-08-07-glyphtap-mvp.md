@@ -17,7 +17,7 @@
 - 每个任务结束必须 `dotnet build` 通过 + 相应测试通过 + git 提交
 - 提交信息风格：`feat:` / `test:` / `chore:` 前缀，简短英文或中文均可，与仓库现有风格一致
 - 禁止引入规格之外的第三方依赖（除下述指定包）
-- 依赖包：`H.NotifyIcon 2.2.1`、`System.Drawing.Common 8.0.0`（主项目）；`xunit.stafact 1.1.0`（测试项目，模板自带的 xunit 系版本保留）
+- 依赖包：`H.NotifyIcon 2.3.0`、`System.Drawing.Common 9.0.1`（主项目）；`Xunit.StaFact 1.1.11`（测试项目，模板自带的 xunit 系版本保留）。> 注：原计划写死 2.2.1/8.0.0/1.1.0，但 NuGet 无这些版本，且 H.NotifyIcon 2.3.0 依赖 System.Drawing.Common >= 9.0.1，经确认改用生态实际版本。
 - 规格文档：`docs/superpowers/specs/2026-08-07-glyphtap-design.md`（实现以该文档为准）
 
 ---
@@ -62,8 +62,8 @@ dotnet sln add src/Glyphtap/Glyphtap.csproj tests/Glyphtap.Tests/Glyphtap.Tests.
     <AssemblyName>Glyphtap</AssemblyName>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="H.NotifyIcon" Version="2.2.1" />
-    <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <PackageReference Include="H.NotifyIcon" Version="2.3.0" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.1" />
   </ItemGroup>
 </Project>
 ```
@@ -83,7 +83,7 @@ dotnet sln add src/Glyphtap/Glyphtap.csproj tests/Glyphtap.Tests/Glyphtap.Tests.
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-    <PackageReference Include="xunit.stafact" Version="1.1.0" />
+    <PackageReference Include="Xunit.StaFact" Version="1.1.11" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Glyphtap\Glyphtap.csproj" />
