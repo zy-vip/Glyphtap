@@ -1733,8 +1733,8 @@ public class ComposerAndClipboardTests
         var result = CaptureComposer.Compose(full, new Rect(0, 0, 100, 100), new Annotation[] { rect });
         var pixels = new byte[100 * 100 * 4];
         result.CopyPixels(pixels, 100 * 4, 0);
-        // 矩形边框中点 (25, 12) 应为蓝色
-        var idx = (12 * 100 + 25) * 4;
+        // 矩形顶边中点 (25, 10)：y=10 为 5px 边框中心线，避免落在边框边缘（反走样 50% 混合）
+        var idx = (10 * 100 + 25) * 4;
         Assert.Equal(Colors.Blue.B, pixels[idx]);
         Assert.Equal(Colors.Blue.G, pixels[idx + 1]);
         Assert.Equal(Colors.Blue.R, pixels[idx + 2]);
