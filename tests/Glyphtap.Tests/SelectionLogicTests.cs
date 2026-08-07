@@ -113,4 +113,14 @@ public class SelectionLogicTests
         Assert.False(logic.HasSelection);
         Assert.Equal(SelectionMode.None, logic.Mode);
     }
+
+    [Fact]
+    public void OnMouseUp_纯点击未拖动不建立选区()
+    {
+        var logic = new SelectionLogic();
+        logic.OnMouseDown(new Point(100, 100));
+        logic.OnMouseUp();
+        Assert.False(logic.HasSelection);
+        Assert.Equal(SelectionMode.None, logic.Mode);
+    }
 }

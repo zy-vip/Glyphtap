@@ -52,12 +52,15 @@ public static class MonitorEnumerator
                 var info = new MONITORINFOEX { cbSize = Marshal.SizeOf<MONITORINFOEX>() };
                 if (GetMonitorInfo(hMonitor, ref info))
                 {
-                    GetDpiForMonitor(hMonitor, MdtEffectiveDpi, out var dpiX, out var dpiY);
+                    // DPI 查询失败时回退 96，避免 0 值导致除零/NaN
+                    var hr = GetDpiForMonitor(hMonitor, MdtEffectiveDpi, out var dpiX, out var dpiY);
+                    var sx = hr == 0 && dpiX > 0 ? (int)dpiX : 96;
+                    var sy = hr == 0 && dpiY > 0 ? (int)dpiY : 96;
                     specs.Add(new MonitorSpec(
                         new Rect(info.rcMonitor.Left, info.rcMonitor.Top,
                                  info.rcMonitor.Right - info.rcMonitor.Left,
                                  info.rcMonitor.Bottom - info.rcMonitor.Top),
-                        (int)dpiX, (int)dpiY,
+                        sx, sy,
                         (info.dwFlags & MonitorInfoFPrimary) != 0));
                 }
                 return true;

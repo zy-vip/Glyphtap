@@ -38,6 +38,9 @@ public partial class App : Application
         _host.Show();
         _host.Hide();
 
+        // 先创建托盘，确保后续提示可用（如热键注册失败降级提示）
+        _tray = new TrayIconService(() => _controller.StartCapture(), ExitApp);
+
         var hwnd = new WindowInteropHelper(_host).Handle;
         var source = HwndSource.FromHwnd(hwnd);
         _hotKey = HotKeyService.Register(hwnd, 0, 0x70); // F1
@@ -50,8 +53,6 @@ public partial class App : Application
         {
             Notify("热键注册失败", "F1 全局热键被占用，仍可通过托盘菜单截图");
         }
-
-        _tray = new TrayIconService(() => _controller.StartCapture(), ExitApp);
     }
 
     private void Notify(string title, string message) => _tray?.ShowNotification(title, message);

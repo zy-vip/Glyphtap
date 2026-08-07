@@ -23,6 +23,7 @@ public sealed class SelectionLogic
     private Rect _startRect;
     private ResizeHandle _activeHandle = ResizeHandle.None;
     private bool _dragging;
+    private bool _moved;
 
     public Rect Selection { get; private set; } = Rect.Empty;
     public SelectionMode Mode { get; private set; } = SelectionMode.None;
@@ -32,6 +33,7 @@ public sealed class SelectionLogic
     {
         _down = p;
         _dragging = true;
+        _moved = false;
 
         if (!HasSelection)
         {
@@ -66,6 +68,9 @@ public sealed class SelectionLogic
         if (!_dragging)
             return;
 
+        if ((p - _down).Length >= 1)
+            _moved = true;
+
         switch (Mode)
         {
             case SelectionMode.Creating:
@@ -88,10 +93,12 @@ public sealed class SelectionLogic
     public void OnMouseUp()
     {
         _dragging = false;
-        if (Mode == SelectionMode.Creating && Selection.Width < 1 && Selection.Height < 1)
+        // 创建但未拖动（纯点击）：视为点击空白，不建立选区
+        if (Mode == SelectionMode.Creating && !_moved)
             Selection = Rect.Empty;
         Mode = SelectionMode.None;
         _activeHandle = ResizeHandle.None;
+        _moved = false;
     }
 
     public void Clear()
@@ -100,6 +107,7 @@ public sealed class SelectionLogic
         Mode = SelectionMode.None;
         _activeHandle = ResizeHandle.None;
         _dragging = false;
+        _moved = false;
     }
 
     /// <summary>反向拖拽归一化：交换起终点。</summary>

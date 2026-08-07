@@ -27,6 +27,9 @@ public sealed partial class CaptureWindow : Window
     private bool _draggingAnnotation;
     private Point _dragLast;
 
+    /// <summary>窗口实际 DPI 缩放（WPF DIP ↔ 物理像素换算基准）。</summary>
+    private double _scale;
+
     public bool IsOpen { get; private set; } = true;
 
     private CaptureWindow(ScreenCaptureResult capture, Action<BitmapSource> onComplete, Action onCancel)
@@ -38,13 +41,15 @@ public sealed partial class CaptureWindow : Window
         InitializeComponent();
         BackgroundImage.Source = BitmapConvert.ToBitmapSource(capture.Bitmap);
 
-        // 窗口覆盖虚拟屏幕（DIP = 物理 / PrimaryScale，Left/Top 可为负）
         var layout = capture.Layout;
         var vb = layout.VirtualBounds;
-        Left = vb.X / layout.PrimaryScale;
-        Top = vb.Y / layout.PrimaryScale;
-        Width = vb.Width / layout.PrimaryScale;
-        Height = vb.Height / layout.PrimaryScale;
+
+        // 窗口显示前以主屏 scale 估算，Show 后按窗口实际 DPI 校正（混合 DPI 下窗口 DPI 不一定是主屏）
+        _scale = layout.PrimaryScale;
+        Left = vb.X / _scale;
+        Top = vb.Y / _scale;
+        Width = vb.Width / _scale;
+        Height = vb.Height / _scale;
 
         BuildMask();
         BuildSelectionVisual();
@@ -55,6 +60,9 @@ public sealed partial class CaptureWindow : Window
 
         PreviewKeyDown += OnPreviewKeyDown;
         PreviewMouseRightButtonUp += (_, _) => Cancel();
+
+        SourceInitialized += (_, _) => RelayoutToWindowDpi();
+        DpiChanged += (_, _) => RelayoutToWindowDpi();
     }
 
     /// <summary>打开截图窗口并强制激活。</summary>
@@ -117,13 +125,36 @@ public sealed partial class CaptureWindow : Window
         }
     }
 
-    // ---- 坐标换算：DP 与物理像素 ----
+    // ---- 坐标换算：DIP 与物理像素（基准 = 窗口实际 DPI） ----
+
+    /// <summary>按窗口实际 DPI 重新覆盖虚拟屏幕（窗口创建/DpiChanged 时调用）。</summary>
+    private void RelayoutToWindowDpi()
+    {
+        var dpi = VisualTreeHelper.GetDpi(this);
+        if (dpi.DpiScaleX <= 0)
+            return;
+        _scale = dpi.DpiScaleX;
+
+        var vb = _capture.Layout.VirtualBounds;
+        Left = vb.X / _scale;
+        Top = vb.Y / _scale;
+        Width = vb.Width / _scale;
+        Height = vb.Height / _scale;
+
+        UpdateSelectionVisual();
+    }
 
     private Point ToPhysical(Point windowPoint)
-        => _capture.Layout.ToPhysical(windowPoint);
+    {
+        var vb = _capture.Layout.VirtualBounds;
+        return new Point(vb.X + windowPoint.X * _scale, vb.Y + windowPoint.Y * _scale);
+    }
 
     private Point ToWindowDips(Point physical)
-        => _capture.Layout.ToWindowDips(physical);
+    {
+        var vb = _capture.Layout.VirtualBounds;
+        return new Point((physical.X - vb.X) / _scale, (physical.Y - vb.Y) / _scale);
+    }
 
     // ---- 鼠标交互（分区创建后进入工具模式） ----
 
@@ -168,7 +199,14 @@ public sealed partial class CaptureWindow : Window
             }
         }
 
+        var hadSelection = _selection.HasSelection;
         _selection.OnMouseDown(p);
+        if (hadSelection && _selection.Mode == SelectionMode.Creating)
+        {
+            // 重新创建选区：旧标注以旧选区为基准，坐标已失效，整体清除
+            _annotations.Clear();
+            RenderAnnotations();
+        }
         RootGrid.CaptureMouse();
         UpdateSelectionVisual();
     }
@@ -245,7 +283,7 @@ public sealed partial class CaptureWindow : Window
         }
 
         var d = ToWindowDips(new Point(s.X, s.Y));
-        var size = new Size(s.Width / _capture.Layout.PrimaryScale, s.Height / _capture.Layout.PrimaryScale);
+        var size = new Size(s.Width / _scale, s.Height / _scale);
         Canvas.SetLeft(_selectionVisual, d.X);
         Canvas.SetTop(_selectionVisual, d.Y);
         _selectionVisual.Width = size.Width;
@@ -253,7 +291,7 @@ public sealed partial class CaptureWindow : Window
         _selectionVisual.Visibility = Visibility.Visible;
 
         // 手柄（物理 8px → DIP）
-        var hSize = 8 / _capture.Layout.PrimaryScale;
+        var hSize = 8 / _scale;
         var pts = new[]
         {
             new Point(s.X, s.Y), new Point(s.X + s.Width / 2, s.Y), new Point(s.X + s.Width, s.Y),
@@ -271,12 +309,14 @@ public sealed partial class CaptureWindow : Window
             _handles[i].Visibility = Visibility.Visible;
         }
 
-        // 遮罩：左 / 右 / 上 / 下 四块
-        var winW = Width * _capture.Layout.PrimaryScale;
-        var winH = Height * _capture.Layout.PrimaryScale;
-        UpdateMask(0, 0, 0, s.X, winH);                          // 左
-        UpdateMask(1, s.X + s.Width, 0, winW - s.X - s.Width, winH); // 右
-        UpdateMask(2, s.X, 0, s.Width, s.Y);                     // 上
+        // 遮罩：左 / 右 / 上 / 下 四块（物理绝对坐标，ToWindowDips 负责换算）
+        var winW = _capture.Layout.VirtualBounds.Width;
+        var winH = _capture.Layout.VirtualBounds.Height;
+        var vbX = _capture.Layout.VirtualBounds.X;
+        var vbY = _capture.Layout.VirtualBounds.Y;
+        UpdateMask(0, vbX, vbY, s.X - vbX, winH);                    // 左
+        UpdateMask(1, s.X + s.Width, vbY, winW - s.X - s.Width, winH); // 右
+        UpdateMask(2, s.X, vbY, s.Width, s.Y - vbY);                 // 上
         UpdateMask(3, s.X, s.Y + s.Height, s.Width, winH - s.Y - s.Height); // 下
         foreach (var m in _maskParts)
             m.Visibility = Visibility.Visible;
@@ -292,8 +332,8 @@ public sealed partial class CaptureWindow : Window
         var d = ToWindowDips(new Point(x, y));
         Canvas.SetLeft(_maskParts[index], d.X);
         Canvas.SetTop(_maskParts[index], d.Y);
-        _maskParts[index].Width = Math.Max(0, w / _capture.Layout.PrimaryScale);
-        _maskParts[index].Height = Math.Max(0, h / _capture.Layout.PrimaryScale);
+        _maskParts[index].Width = Math.Max(0, w / _scale);
+        _maskParts[index].Height = Math.Max(0, h / _scale);
     }
 
     // ---- 标注渲染 ----
@@ -321,7 +361,7 @@ public sealed partial class CaptureWindow : Window
 
     private FrameworkElement AnnotationElement(Annotation a)
     {
-        var scale = _capture.Layout.PrimaryScale;
+        var scale = _scale;
         var strokeThickness = a.Thickness / scale;
 
         switch (a)
@@ -363,6 +403,7 @@ public sealed partial class CaptureWindow : Window
                 {
                     Stroke = new SolidColorBrush(a.Color),
                     StrokeThickness = strokeThickness,
+                    StrokeLineJoin = PenLineJoin.Round,
                     StrokeStartLineCap = PenLineCap.Round,
                     StrokeEndLineCap = PenLineCap.Round,
                 };
@@ -385,6 +426,7 @@ public sealed partial class CaptureWindow : Window
                 {
                     Stroke = new SolidColorBrush(a.Color),
                     StrokeThickness = strokeThickness,
+                    StrokeLineJoin = PenLineJoin.Round,
                     StrokeStartLineCap = PenLineCap.Round,
                     StrokeEndLineCap = PenLineCap.Round,
                 };
@@ -443,6 +485,8 @@ public sealed partial class CaptureWindow : Window
 
     private void Complete()
     {
+        if (!IsOpen)
+            return;
         if (!_selection.HasSelection)
             return;
         IsOpen = false;
@@ -451,13 +495,17 @@ public sealed partial class CaptureWindow : Window
             _selection.Selection,
             _annotations.Items);
         Close();
+        _capture.Bitmap.Dispose();
         _onComplete(composed);
     }
 
     private void Cancel()
     {
+        if (!IsOpen)
+            return;
         IsOpen = false;
         Close();
+        _capture.Bitmap.Dispose();
         _onCancel();
     }
 }

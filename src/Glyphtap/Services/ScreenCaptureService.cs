@@ -24,34 +24,34 @@ public static class ScreenCaptureService
         var layout = ScreenLayout.Create(MonitorEnumerator.Enumerate());
         var parts = new List<(Rect Dest, Bitmap Src)>();
 
-        foreach (var monitor in layout.Monitors)
-        {
-            var prev = SetThreadDpiAwarenessContext(PerMonitorV2);
-            try
-            {
-                var b = monitor.Bounds;
-                var bmp = new Bitmap((int)b.Width, (int)b.Height, PixelFormat.Format32bppArgb);
-                using (var g = Graphics.FromImage(bmp))
-                {
-                    g.CopyFromScreen((int)b.X, (int)b.Y, 0, 0, new System.Drawing.Size((int)b.Width, (int)b.Height));
-                }
-                parts.Add((new Rect(b.X, b.Y, b.Width, b.Height), bmp));
-            }
-            finally
-            {
-                SetThreadDpiAwarenessContext(prev);
-            }
-        }
-
         try
         {
+            foreach (var monitor in layout.Monitors)
+            {
+                var prev = SetThreadDpiAwarenessContext(PerMonitorV2);
+                try
+                {
+                    var b = monitor.Bounds;
+                    var bmp = new Bitmap((int)b.Width, (int)b.Height, PixelFormat.Format32bppArgb);
+                    using (var g = Graphics.FromImage(bmp))
+                    {
+                        g.CopyFromScreen((int)b.X, (int)b.Y, 0, 0, new System.Drawing.Size((int)b.Width, (int)b.Height));
+                    }
+                    parts.Add((new Rect(b.X, b.Y, b.Width, b.Height), bmp));
+                }
+                finally
+                {
+                    SetThreadDpiAwarenessContext(prev);
+                }
+            }
+
             return new ScreenCaptureResult(Stitch(parts, layout.VirtualBounds), layout);
         }
-        catch
+        finally
         {
+            // 拼接已完成像素拷贝，源位图即可释放（成功与失败路径均回收）
             foreach (var (_, bmp) in parts)
                 bmp.Dispose();
-            throw;
         }
     }
 

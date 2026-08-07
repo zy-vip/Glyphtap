@@ -9,6 +9,8 @@ public static class ClipboardService
     public static void SetImage(BitmapSource image)
     {
         System.Windows.Clipboard.SetImage(image);
+        // Flush 使数据在进程退出后仍然有效（延迟渲染需常驻进程）
+        System.Windows.Clipboard.Flush();
     }
 
     public static void SetText(string text)

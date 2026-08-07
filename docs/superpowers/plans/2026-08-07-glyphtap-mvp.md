@@ -4,7 +4,7 @@
 
 **Goal:** 实现 Windows 截图工具 MVP：托盘常驻 + F1 全局热键 + 区域截图 + 矩形/椭圆/箭头/画笔标注 + 复制到剪贴板，架构为 V2 OCR 预留扩展点。
 
-**Architecture:** WPF .NET 8 单全屏窗口覆盖虚拟屏幕（PerMonitorV2 DPI 感知）。所有几何逻辑（选区、标注、屏幕布局）运行在**物理像素空间**，纯逻辑类可单元测试；窗口只做 DIP→物理像素的入口换算（以主屏 scale 为基准）。标注/合成用 DrawingContext + RenderTargetBitmap 以物理像素输出，保证多屏/高 DPI 下无偏移。
+**Architecture:** WPF .NET 8 单全屏窗口覆盖虚拟屏幕（PerMonitorV2 DPI 感知）。所有几何逻辑（选区、标注、屏幕布局）运行在**物理像素空间**，纯逻辑类可单元测试；窗口只做 DIP→物理像素的入口换算（基准 = 窗口实际 DPI，混合 DPI 下 WPF 窗口 DPI 由重叠面积最大的显示器决定，不一定是主屏）。标注/合成用 DrawingContext + RenderTargetBitmap 以物理像素输出，保证多屏/高 DPI 下无偏移。
 
 **Tech Stack:** .NET 8 / WPF / xUnit / H.NotifyIcon（托盘）/ System.Drawing.Common（分屏捕获拼接）
 
@@ -17,7 +17,7 @@
 - 每个任务结束必须 `dotnet build` 通过 + 相应测试通过 + git 提交
 - 提交信息风格：`feat:` / `test:` / `chore:` 前缀，简短英文或中文均可，与仓库现有风格一致
 - 禁止引入规格之外的第三方依赖（除下述指定包）
-- 依赖包：`H.NotifyIcon 2.3.0`、`System.Drawing.Common 9.0.1`（主项目）；`Xunit.StaFact 1.1.11`（测试项目，模板自带的 xunit 系版本保留）。> 注：原计划写死 2.2.1/8.0.0/1.1.0，但 NuGet 无这些版本，且 H.NotifyIcon 2.3.0 依赖 System.Drawing.Common >= 9.0.1，经确认改用生态实际版本。
+- 依赖包：`H.NotifyIcon.Wpf 2.3.0`（WPF 版 TaskbarIcon 所在包，Core 由传递依赖；原计划 `H.NotifyIcon` 单包只有 Core 无控件）、`System.Drawing.Common 9.0.1`（主项目）；`Xunit.StaFact 1.1.11`（测试项目，模板自带的 xunit 系版本保留）。> 注：原计划写死 2.2.1/8.0.0/1.1.0，但 NuGet 无这些版本，且 WPF 控件在 `H.NotifyIcon.Wpf` 包，经确认改用生态实际版本。
 - 规格文档：`docs/superpowers/specs/2026-08-07-glyphtap-design.md`（实现以该文档为准）
 
 ---
@@ -3030,3 +3030,23 @@ git commit -m "feat: 全局热键/托盘/单实例装配 + OCR 接口预留"
 | 11 | 高 DPI 清晰度 | T2/T7/T8 |
 | 12 | 退出无残留进程 | T11 |
 | 13 | 剪贴板失败 → 临时文件保存 + 提示 | T11 |
+## 代码审查修正记录（Task 全部完成后）
+
+基于 superpowers:requesting-code-review 审查结果，修订如下（均已通过构建 + 38 测试）：
+
+| # | 级别 | 内容 | 修复位置 |
+|---|------|------|----------|
+| S1 | 严重 | 截屏捕获循环的每屏位图在成功路径与中途异常时均未释放，托盘常驻会累积 GDI 句柄 | `ScreenCaptureService.Capture` 改为 try/finally 全部释放 |
+| S2 | 严重 | 原《主屏 scale 为准》在 PMv2 下不成立：全屏窗口 DPI 由重叠面积最大显示器决定，混合 DPI 会整体错位 | `CaptureWindow` 改为窗口实际 DPI（`VisualTreeHelper.GetDpi` + `SourceInitialized`/`DpiChanged` 校正），`ScreenLayout` 换算仅供测试，已同步 Global Constraints |
+| I1 | 重要 | 热键注册失败提示发生在托盘创建之前，`_tray` 为 null 导致提示被吞 | `App.OnStartup` 先创建托盘再注册热键 |
+| I2 | 重要 | 遮罩左/上两块用了窗口原点 (0,0) 而右/下用虚拟屏幕绝对坐标，负虚拟原点点错位 | `UpdateSelectionVisual` 四块统一传虚拟屏幕绝对坐标并修正宽高 |
+| I3 | 重要 | 剪贴板未 `Flush`，进程退出后图片失效 | `ClipboardService.SetImage` 增加 `Clipboard.Flush()` |
+| I4 | 重要 | 重建选区后旧标注仍以旧选区坐标系渲染（残影） | 选区进入 Creating 且已有选区时 `_annotations.Clear()` |
+| M1 | 次要 | `Complete`/`Cancel` 无防重入 | 入口增加 `IsOpen` 检查；结束后 `Dispose` 捕获位图 |
+| M2 | 次要 | `GetDpiForMonitor` 失败返回 0 会引后续除零 | 失败回退 96 |
+| M3 | 次要 | 临时文件落盘失败时异常可能穿越回调 | 落盘包 try/catch 并提示 |
+| M5 | 次要 | 预览 Polyline 缺 `StrokeLineJoin=Round` 与最终合成不一致 | 箭头/画笔 Polyline 补 Round |
+| M6 | 次要 | 点击未拖动也建立 8×8 选区 | 增加 `_moved` 标志，Creating 且未移动则清空（新增回归测试） |
+| M7 | 次要 | `H.NotifyIcon`（Core）直接引用冗余 | 移除，由 `H.NotifyIcon.Wpf` 传递依赖 |
+
+评估结论：修改后合并。

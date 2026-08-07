@@ -40,11 +40,18 @@ public sealed class CaptureController
         }
         catch (Exception ex)
         {
-            var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Glyphtap");
-            System.IO.Directory.CreateDirectory(dir);
-            var path = System.IO.Path.Combine(dir, $"截图_{DateTime.Now:yyyyMMdd_HHmmss}.png");
-            System.IO.File.WriteAllBytes(path, ClipboardService.EncodePng(image));
-            _notify("复制失败", $"剪贴板写入失败（{ex.Message}），截图已保存到：\n{path}");
+            try
+            {
+                var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "Glyphtap");
+                System.IO.Directory.CreateDirectory(dir);
+                var path = System.IO.Path.Combine(dir, $"截图_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+                System.IO.File.WriteAllBytes(path, ClipboardService.EncodePng(image));
+                _notify("复制失败", $"剪贴板写入失败（{ex.Message}），截图已保存到：\n{path}");
+            }
+            catch (Exception saveEx)
+            {
+                _notify("复制失败", $"剪贴板写入失败（{ex.Message}），且保存到临时文件也失败（{saveEx.Message}）");
+            }
         }
         _window = null;
     }
