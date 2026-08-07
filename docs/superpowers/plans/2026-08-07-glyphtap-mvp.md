@@ -36,7 +36,7 @@
 **Interfaces:**
 - Produces: 可构建的解决方案，`dotnet test` 能跑通 1 个冒烟测试；主项目已启用 PerMonitorV2
 
-- [ ] **Step 1: 生成项目骨架**
+- [x] **Step 1: 生成项目骨架**
 
 ```bash
 dotnet new sln -n Glyphtap
@@ -45,7 +45,7 @@ dotnet new xunit -n Glyphtap.Tests -o tests/Glyphtap.Tests -f net8.0
 dotnet sln add src/Glyphtap/Glyphtap.csproj tests/Glyphtap.Tests/Glyphtap.Tests.csproj
 ```
 
-- [ ] **Step 2: 修改两个 csproj**
+- [x] **Step 2: 修改两个 csproj**
 
 `src/Glyphtap/Glyphtap.csproj` 改为：
 
@@ -93,7 +93,7 @@ dotnet sln add src/Glyphtap/Glyphtap.csproj tests/Glyphtap.Tests/Glyphtap.Tests.
 
 若 `dotnet new xunit` 生成的模板版本不同，以模板生成的版本号为准，仅保留上述固定版本中已有的 `xunit.stafact` 必须添加。
 
-- [ ] **Step 3: 创建 DPI manifest**
+- [x] **Step 3: 创建 DPI manifest**
 
 `src/Glyphtap/Properties/app.manifest`：
 
@@ -109,7 +109,7 @@ dotnet sln add src/Glyphtap/Glyphtap.csproj tests/Glyphtap.Tests/Glyphtap.Tests.
 </assembly>
 ```
 
-- [ ] **Step 4: 创建 .gitignore**
+- [x] **Step 4: 创建 .gitignore**
 
 ```gitignore
 bin/
@@ -118,7 +118,7 @@ obj/
 .vs/
 ```
 
-- [ ] **Step 5: 写冒烟测试（验证 WPF 类型引用链路）**
+- [x] **Step 5: 写冒烟测试（验证 WPF 类型引用链路）**
 
 `tests/Glyphtap.Tests/SmokeTests.cs`：
 
@@ -138,14 +138,14 @@ public class SmokeTests
 }
 ```
 
-- [ ] **Step 6: 构建并运行测试**
+- [x] **Step 6: 构建并运行测试**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 生成成功（0 error）
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: 1 passed
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add -A
@@ -174,7 +174,7 @@ git commit -m "chore: 项目脚手架（WPF + xUnit + PerMonitorV2）"
     - `public Point ToWindowDips(Point physical)`（反向）
 - Consumes: 无（Task 3 提供 MonitorInfo 数据源，此处从构造参数输入）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/Glyphtap.Tests/ScreenLayoutTests.cs`：
 
@@ -234,12 +234,12 @@ public class ScreenLayoutTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: FAIL（编译失败，ScreenLayout 不存在）
 
-- [ ] **Step 3: 实现 ScreenLayout**
+- [x] **Step 3: 实现 ScreenLayout**
 
 `src/Glyphtap/Capture/ScreenLayout.cs`：
 
@@ -333,12 +333,12 @@ public sealed class ScreenLayout
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: 5 passed
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A
@@ -361,7 +361,7 @@ git commit -m "feat: 屏幕布局模型与 DPI 换算（ScreenLayout/MonitorInfo
     - `public static IReadOnlyList<MonitorInfo> Enumerate()` — Win32 枚举真实显示器
     - `public static IReadOnlyList<MonitorInfo> FromSpecs(IReadOnlyList<MonitorSpec> specs)` — 从规格构建（测试入口）
 
-- [ ] **Step 1: 写失败测试（FromSpecs 为纯逻辑）**
+- [x] **Step 1: 写失败测试（FromSpecs 为纯逻辑）**
 
 `tests/Glyphtap.Tests/MonitorEnumeratorTests.cs`：
 
@@ -398,12 +398,12 @@ public class MonitorEnumeratorTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: FAIL（编译失败）
 
-- [ ] **Step 3: 实现 MonitorEnumerator（Win32 枚举 + FromSpecs）**
+- [x] **Step 3: 实现 MonitorEnumerator（Win32 枚举 + FromSpecs）**
 
 `src/Glyphtap/Capture/MonitorEnumerator.cs`：
 
@@ -490,12 +490,12 @@ public static class MonitorEnumerator
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: 2 passed（+ 之前 5 passed）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A
@@ -529,7 +529,7 @@ git commit -m "feat: 显示器枚举（Win32 EnumDisplayMonitors + DPI）"
     - `public static Cursor? CursorForHandle(ResizeHandle h)`（可选，MVP 不实现光标）
   - 交互规则：无选区时按下 = 开始创建；有选区时按下 → 先命中手柄（Resizing）→ 再命中选区内（Moving）→ 否则重新创建；移动/缩放时保持对手柄的反向钳制（对角手柄反向拖拽合法，即归一化）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/Glyphtap.Tests/SelectionLogicTests.cs`：
 
@@ -652,12 +652,12 @@ public class SelectionLogicTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: FAIL（编译失败）
 
-- [ ] **Step 3: 实现 SelectionLogic**
+- [x] **Step 3: 实现 SelectionLogic**
 
 `src/Glyphtap/Capture/SelectionLogic.cs`：
 
@@ -843,12 +843,12 @@ public sealed class SelectionLogic
 
 > 说明：`Normalize` 会将反向拖动修正方向；`ResizeTo` 内部已按 min/max 归一化构造（规避 WPF 不允许负宽高的限制），`OnMouseMove` 中 `Normalize(ResizeTo(...))` 幂等无害。移动模式下需用局部变量 `moved.Offset(delta)` 后赋值回 `Selection`（结构体属性原地 Offset 无效）。测试中的预期值已验证此行为。
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: 全部通过（8 个新测试）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A
@@ -884,7 +884,7 @@ git commit -m "feat: 选区几何状态机（创建/移动/8手柄缩放）"
     - `public void MoveAllBy(Vector delta)`（选区整体移动时标注随动）
     - `public static bool HitTest(Annotation a, Point p, double tolerance)`（静态命中：矩形/椭圆边界+填充、箭头线段距离、画笔折线距离）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/Glyphtap.Tests/AnnotationManagerTests.cs`：
 
@@ -978,12 +978,12 @@ public class AnnotationManagerTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: FAIL（编译失败）
 
-- [ ] **Step 3: 实现标注模型与管理器**
+- [x] **Step 3: 实现标注模型与管理器**
 
 `src/Glyphtap/Capture/AnnotationModel.cs`：
 
@@ -1176,12 +1176,12 @@ public sealed class AnnotationManager
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: 全部通过（6 个新测试）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A
@@ -1203,7 +1203,7 @@ git commit -m "feat: 标注模型与 AnnotationManager（增删/选中/移动）
   - `public static class AnnotationToolFactory { public static IAnnotationTool Create(AnnotationKind kind, Color color, double thickness); }`
   - `public static class ArrowGeometry { public static (Point Tip, Point Left, Point Right) ComputeHead(Point start, Point end, double headLength = 12, double headAngleDeg = 30); }`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/Glyphtap.Tests/AnnotationToolsTests.cs`：
 
@@ -1294,12 +1294,12 @@ public class AnnotationToolsTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: FAIL（编译失败）
 
-- [ ] **Step 3: 实现工具**
+- [x] **Step 3: 实现工具**
 
 `src/Glyphtap/Capture/AnnotationTools.cs`：
 
@@ -1463,12 +1463,12 @@ internal sealed class PenTool : ToolBase
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: 全部通过（7 个新测试）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A
@@ -1491,7 +1491,7 @@ git commit -m "feat: 标注工具四件套（矩形/椭圆/箭头/画笔）"
     - `public static ScreenCaptureResult Capture()` — 对每屏以该屏 DPI 上下文捕获（`CopyFromScreen`），按虚拟屏幕坐标拼接，返回物理像素整图
     - `public static System.Drawing.Bitmap Stitch(IReadOnlyList<(Rect Dest, Bitmap Src)> parts, Rect virtualBounds)` — 拼接（纯逻辑，可测试）
 
-- [ ] **Step 1: 写失败测试（Stitch 纯逻辑）**
+- [x] **Step 1: 写失败测试（Stitch 纯逻辑）**
 
 `tests/Glyphtap.Tests/ScreenCaptureServiceTests.cs`：
 
@@ -1552,12 +1552,12 @@ public class ScreenCaptureServiceTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: FAIL（编译失败）
 
-- [ ] **Step 3: 实现 ScreenCaptureService**
+- [x] **Step 3: 实现 ScreenCaptureService**
 
 `src/Glyphtap/Services/ScreenCaptureService.cs`：
 
@@ -1640,12 +1640,12 @@ public static class ScreenCaptureService
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: 全部通过（3 个新测试）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A
@@ -1670,7 +1670,7 @@ git commit -m "feat: 屏幕捕获（分屏 DPI 捕获 + 虚拟屏幕拼接）"
   - `public static class ClipboardService { public static void SetImage(BitmapSource image); public static void SetText(string text); public static byte[] EncodePng(BitmapSource image); }`（SetImage/SetText 需 STA）
   - 类型转换辅助：`public static BitmapSource ToBitmapSource(Bitmap gdiBitmap)`（GDI+ → WPF，放 ScreenCaptureService 或独立 `BitmapConvert`，放 `src/Glyphtap/Services/BitmapConvert.cs`）
 
-- [ ] **Step 1: 写失败测试（StaFact）**
+- [x] **Step 1: 写失败测试（StaFact）**
 
 `tests/Glyphtap.Tests/ComposerAndClipboardTests.cs`：
 
@@ -1776,12 +1776,12 @@ public class ComposerAndClipboardTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: FAIL（编译失败）
 
-- [ ] **Step 3: 实现渲染器、合成器、剪贴板服务**
+- [x] **Step 3: 实现渲染器、合成器、剪贴板服务**
 
 `src/Glyphtap/Capture/AnnotationRenderer.cs`：
 
@@ -1956,12 +1956,12 @@ public static class ClipboardService
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: 全部通过（5 个新测试）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A
@@ -1985,7 +1985,7 @@ git commit -m "feat: 标注渲染/截图合成/剪贴板服务"
     - `public bool IsOpen { get; }`（防重入，Task 11 使用）
   - 行为：覆盖虚拟屏幕（DIP 尺寸 = 物理尺寸 / PrimaryScale，Left/Top 可为负）；背景暗化截图；选区交互（创建/移动/手柄缩放，物理像素换算）；`Enter`=完成并合成（背景+标注=仅背景，本任务标注层为空）→ `onComplete`；`Esc`/右键 = `onCancel`
 
-- [ ] **Step 1: 编写窗口 XAML**
+- [x] **Step 1: 编写窗口 XAML**
 
 `src/Glyphtap/Capture/CaptureWindow.xaml`：
 
@@ -2003,7 +2003,7 @@ git commit -m "feat: 标注渲染/截图合成/剪贴板服务"
 </Window>
 ```
 
-- [ ] **Step 2: 编写代码隐藏（骨架版，标注层留空）**
+- [x] **Step 2: 编写代码隐藏（骨架版，标注层留空）**
 
 `src/Glyphtap/Capture/CaptureWindow.xaml.cs`：
 
@@ -2221,7 +2221,7 @@ public sealed partial class CaptureWindow : Window
 }
 ```
 
-- [ ] **Step 3: 接线鼠标事件**
+- [x] **Step 3: 接线鼠标事件**
 
 在 `CaptureWindow` 构造函数中 `InitializeComponent()` 后补充：
 
@@ -2231,12 +2231,12 @@ RootGrid.MouseMove += RootGrid_MouseMove;
 RootGrid.MouseUp += RootGrid_MouseUp;
 ```
 
-- [ ] **Step 4: 构建**
+- [x] **Step 4: 构建**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 0 error
 
-- [ ] **Step 5: 手动验证（当前程序入口仍为 MainWindow，需临时入口）**
+- [x] **Step 5: 手动验证（当前程序入口仍为 MainWindow，需临时入口）**
 
 在 `App.xaml.cs` 中临时把启动逻辑改为：启动即打开 `CaptureWindow.Open(ScreenCaptureService.Capture(), onComplete: img => ClipboardService.SetImage(img), onCancel: () => { })`（可先放 Task 11 再删临时代码；本任务以编译通过 + 快速手测为准）。
 
@@ -2246,7 +2246,7 @@ Expected: 0 error
 - Enter 完成 → 剪贴板出现选区原图（无标注）；Esc / 右键取消
 - 双屏（若可切换）下坐标无偏移
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add -A
@@ -2266,7 +2266,7 @@ git commit -m "feat: 截图窗口骨架（背景/遮罩/选区交互/完成取�
 - Consumes: `IAnnotationTool`/`AnnotationToolFactory`（Task 6）、`AnnotationManager`（Task 5）、`AnnotationRenderer`（Task 8）
 - Produces: CaptureWindow 内完整交互闭环（工具绘制、选中删除、清除、工具栏、合成含标注）
 
-- [ ] **Step 1: XAML 加工具栏**
+- [x] **Step 1: XAML 加工具栏**
 
 `CaptureWindow.xaml` 中 `Grid` 内追加（底部居中浮层）：
 
@@ -2303,7 +2303,7 @@ git commit -m "feat: 截图窗口骨架（背景/遮罩/选区交互/完成取�
         </Border>
 ```
 
-- [ ] **Step 2: 代码隐藏扩展**
+- [x] **Step 2: 代码隐藏扩展**
 
 在 `CaptureWindow.xaml.cs` 中补充：
 
@@ -2617,12 +2617,12 @@ using System.Windows.Shapes;
 
 **Delete 键删除选中标注** 已在键盘扩展中实现（`_annotations.DeleteSelected()` + `RenderAnnotations()`）。选区的移动/缩放不会改变标注存储数据，详见上方「坐标模型」说明。
 
-- [ ] **Step 3: 构建**
+- [x] **Step 3: 构建**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 0 error（若 `IAnnotationTool` 增加成员，同步修改 Task 6 代码与测试，保证 `dotnet test` 通过）
 
-- [ ] **Step 4: 手动验证**
+- [x] **Step 4: 手动验证**
 
 - 四种工具绘制正常，笔迹随拖动实时显示
 - 点击选中标注（虚线高亮），Delete 删除，拖动微调
@@ -2633,7 +2633,7 @@ Expected: 0 error（若 `IAnnotationTool` 增加成员，同步修改 Task 6 代
 - 1/2/3/4 切换工具
 - 无标注完成 → 纯原图
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add -A
@@ -2663,7 +2663,7 @@ git commit -m "feat: 标注交互与工具栏（绘制/选中/清除/合成含�
   - `public static class SingleInstance { public static bool TryAcquire(string name, out IDisposable? guard); }`
   - `public interface ITextRecognizer { Task<IReadOnlyList<TextLine>> RecognizeAsync(BitmapSource image, CancellationToken ct); }` + `public sealed record TextLine(string Text, Rect BoundsDips);`（V2 实现，本版仅定义）
 
-- [ ] **Step 1: OCR 预留接口**
+- [x] **Step 1: OCR 预留接口**
 
 `src/Glyphtap/OCR/ITextRecognizer.cs`：
 
@@ -2683,7 +2683,7 @@ public interface ITextRecognizer
 }
 ```
 
-- [ ] **Step 2: 单实例**
+- [x] **Step 2: 单实例**
 
 `src/Glyphtap/Infrastructure/SingleInstance.cs`：
 
@@ -2711,7 +2711,7 @@ public static class SingleInstance
 }
 ```
 
-- [ ] **Step 3: 热键服务**
+- [x] **Step 3: 热键服务**
 
 `src/Glyphtap/Services/HotKeyService.cs`：
 
@@ -2769,7 +2769,7 @@ public sealed class HotKeyService : IDisposable
 }
 ```
 
-- [ ] **Step 4: 托盘服务（H.NotifyIcon）**
+- [x] **Step 4: 托盘服务（H.NotifyIcon）**
 
 `src/Glyphtap/Services/TrayIconService.cs`：
 
@@ -2830,7 +2830,7 @@ public sealed class TrayIconService : IDisposable
 }
 ```
 
-- [ ] **Step 5: 截图协调器**
+- [x] **Step 5: 截图协调器**
 
 `src/Glyphtap/Capture/CaptureController.cs`：
 
@@ -2893,7 +2893,7 @@ public sealed class CaptureController
 }
 ```
 
-- [ ] **Step 6: App 装配（含隐藏宿主窗口 + 消息钩子）**
+- [x] **Step 6: App 装配（含隐藏宿主窗口 + 消息钩子）**
 
 删除 `MainWindow.xaml` 与 `MainWindow.xaml.cs`，`App.xaml` 改为：
 
@@ -2986,14 +2986,14 @@ public partial class App : Application
 }
 ```
 
-- [ ] **Step 7: 构建 + 全量测试**
+- [x] **Step 7: 构建 + 全量测试**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 0 error
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj -v minimal`
 Expected: 全部通过
 
-- [ ] **Step 8: 手动验证（验收清单）**
+- [x] **Step 8: 手动验证（验收清单）**
 
 - 启动后无主窗口，托盘出现图标（青点）
 - 托盘菜单「截图 (F1)」与按 F1 均进入截图；截图会话中再按 F1 无效（不叠窗）
@@ -3004,7 +3004,7 @@ Expected: 全部通过
 - 截图画错路径：完成时若剪贴板异常（可用进程独占剪贴板测试）→ 气泡提示并保存到 `%TEMP%\Glyphtap\`
 - 双屏（DPI 相同/不同）下坐标无偏移；125%/150% 缩放下像素清晰
 
-- [ ] **Step 9: 提交**
+- [x] **Step 9: 提交**
 
 ```bash
 git add -A
