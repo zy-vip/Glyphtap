@@ -1332,7 +1332,7 @@ public static class AnnotationToolFactory
     };
 }
 
-/// <summary>箭头几何：尖在终点，两翼后掠 headAngle 度。</summary>
+/// <summary>箭头几何：尖在终点，两翼自终点横向对称张开 headAngle 度。</summary>
 public static class ArrowGeometry
 {
     public static (Point Tip, Point Left, Point Right) ComputeHead(Point start, Point end, double headLength = 12, double headAngleDeg = 30)
@@ -1342,11 +1342,10 @@ public static class ArrowGeometry
         if (len < 1e-9)
             return (end, end, end);
         var dir = v / len;
-        var back = new Vector(-dir.X, -dir.Y) * headLength;
         var angle = headAngleDeg * Math.PI / 180;
         var wing = headLength * Math.Tan(angle);
         var perp = new Vector(-dir.Y, dir.X) * wing;
-        return (end, end + back - perp, end + back + perp);
+        return (end, end + perp, end - perp);
     }
 }
 
