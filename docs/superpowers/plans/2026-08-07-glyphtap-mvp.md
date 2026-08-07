@@ -2343,7 +2343,7 @@ using System.Windows.Shapes;
             return;
 
         // 工具栏按钮点击会冒泡到此，忽略以保护工具栏交互
-        if (Toolbar.Visibility == Visibility.Visible && IsInsideToolbar(e.OriginalSource))
+        if (Toolbar.Visibility == Visibility.Visible && IsInToolbar(e.OriginalSource))
             return;
 
         var p = ToPhysical(e.GetPosition(this));
