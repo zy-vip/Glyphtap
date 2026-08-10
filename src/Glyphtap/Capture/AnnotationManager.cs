@@ -7,11 +7,47 @@ public sealed class AnnotationManager
 {
     private readonly List<Annotation> _items = new();
     private Annotation? _selected;
+    private const int MaxUndoDepth = 100;
+    private readonly Stack<List<Annotation>> _undoStack = new();
+    private readonly Stack<List<Annotation>> _redoStack = new();
 
     public IReadOnlyList<Annotation> Items => _items;
     public Annotation? Selected => _selected;
 
-    public void Add(Annotation a) => _items.Add(a);
+    /// <summary>是否有可撤销的历史。</summary>
+    public bool CanUndo => _undoStack.Count > 0;
+
+    /// <summary>是否有可重做的历史。</summary>
+    public bool CanRedo => _redoStack.Count > 0;
+
+    /// <summary>当前列表的深拷贝快照。</summary>
+    private List<Annotation> Snapshot() => _items.Select(a => a.Clone()).ToList();
+
+    /// <summary>
+    /// 推送撤销点：记录当前状态，清空重做栈。
+    /// 修改动作（Add/DeleteSelected/Clear/MoveAllBy）自动调用；MoveSelectedBy 由 UI 在手势开始时调用一次。
+    /// </summary>
+    public void PushUndoPoint()
+    {
+        _undoStack.Push(Snapshot());
+        if (_undoStack.Count > MaxUndoDepth)
+        {
+            // 丢弃最旧快照（栈底；Stack 只提供 Pop 栈顶，故重建列表后移除首元素）
+            var all = _undoStack.ToList();
+            all.RemoveAt(0);
+            _undoStack.Clear();
+            foreach (var s in all)
+                _undoStack.Push(s);
+        }
+        _redoStack.Clear();
+    }
+
+    /// <summary>新增标注（自动记录撤销点）。</summary>
+    public void Add(Annotation a)
+    {
+        PushUndoPoint();
+        _items.Add(a);
+    }
 
     /// <summary>命中测试（后加入者优先，即最上层）。</summary>
     public bool TrySelectAt(Point p, double tolerance)
@@ -28,15 +64,22 @@ public sealed class AnnotationManager
         return false;
     }
 
+    /// <summary>删除选中（无选中时不记录）。</summary>
     public void DeleteSelected()
     {
-        if (_selected != null)
-            _items.Remove(_selected);
+        if (_selected == null)
+            return;
+        PushUndoPoint();
+        _items.Remove(_selected);
         _selected = null;
     }
 
+    /// <summary>清空全部（空时不记录）。</summary>
     public void Clear()
     {
+        if (_items.Count == 0)
+            return;
+        PushUndoPoint();
         _items.Clear();
         _selected = null;
     }
@@ -47,11 +90,40 @@ public sealed class AnnotationManager
             _selected.Offset(delta);
     }
 
-    /// <summary>选区整体移动时所有标注随动，保持相对位置。</summary>
+    /// <summary>选区整体移动时所有标注随动，保持相对位置（自动记录撤销点）。</summary>
     public void MoveAllBy(Vector delta)
     {
+        if (_items.Count == 0)
+            return;
+        PushUndoPoint();
         foreach (var a in _items)
             a.Offset(delta);
+    }
+
+    /// <summary>撤销：当前状态入重做栈，还原到上一次快照。</summary>
+    public void Undo()
+    {
+        if (!CanUndo)
+            return;
+        _redoStack.Push(Snapshot());
+        ReplaceItems(_undoStack.Pop());
+    }
+
+    /// <summary>重做：撤销的逆操作。</summary>
+    public void Redo()
+    {
+        if (!CanRedo)
+            return;
+        _undoStack.Push(Snapshot());
+        ReplaceItems(_redoStack.Pop());
+    }
+
+    /// <summary>用快照替换当前条目，选中清空（历史快照不保留选中）。</summary>
+    private void ReplaceItems(List<Annotation> snapshot)
+    {
+        _items.Clear();
+        _items.AddRange(snapshot);
+        _selected = null;
     }
 
     /// <summary>静态命中测试：矩形/椭圆边界或内部、箭头与画笔按线段距离。</summary>

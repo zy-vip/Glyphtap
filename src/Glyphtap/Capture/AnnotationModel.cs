@@ -15,6 +15,9 @@ public abstract class Annotation
     public abstract Rect Bounds { get; }
     public abstract void Offset(Vector delta);
     public abstract void Resize(Rect newBounds);
+
+    /// <summary>深拷贝（撤销快照用；画笔需复制点列表，其余复制值字段）。</summary>
+    public abstract Annotation Clone();
 }
 
 public sealed class RectangleAnnotation : Annotation
@@ -24,6 +27,8 @@ public sealed class RectangleAnnotation : Annotation
     public override Rect Bounds => Rect;
     public override void Offset(Vector delta) => Rect.Offset(delta);
     public override void Resize(Rect newBounds) => Rect = newBounds;
+    public override Annotation Clone() =>
+        new RectangleAnnotation { Rect = Rect, Color = Color, Thickness = Thickness };
 }
 
 public sealed class EllipseAnnotation : Annotation
@@ -33,6 +38,8 @@ public sealed class EllipseAnnotation : Annotation
     public override Rect Bounds => Rect;
     public override void Offset(Vector delta) => Rect.Offset(delta);
     public override void Resize(Rect newBounds) => Rect = newBounds;
+    public override Annotation Clone() =>
+        new EllipseAnnotation { Rect = Rect, Color = Color, Thickness = Thickness };
 }
 
 public sealed class ArrowAnnotation : Annotation
@@ -44,6 +51,8 @@ public sealed class ArrowAnnotation : Annotation
                                             new Point(Math.Max(Start.X, End.X), Math.Max(Start.Y, End.Y)));
     public override void Offset(Vector delta) { Start += delta; End += delta; }
     public override void Resize(Rect newBounds) { /* 箭头 MVP 不缩放，仅移动时随 Offset */ }
+    public override Annotation Clone() =>
+        new ArrowAnnotation { Start = Start, End = End, Color = Color, Thickness = Thickness };
 }
 
 public sealed class PenAnnotation : Annotation
@@ -66,4 +75,10 @@ public sealed class PenAnnotation : Annotation
     }
     public override void Offset(Vector delta) { for (var i = 0; i < Points.Count; i++) Points[i] += delta; }
     public override void Resize(Rect newBounds) { /* 画笔 MVP 不缩放 */ }
+    public override Annotation Clone()
+    {
+        var copy = new PenAnnotation { Color = Color, Thickness = Thickness };
+        copy.Points.AddRange(Points);
+        return copy;
+    }
 }
