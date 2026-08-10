@@ -26,6 +26,7 @@ public sealed partial class CaptureWindow : Window
     private double _thickness = 3;
     private bool _draggingAnnotation;
     private Point _dragLast;
+    private bool _dragUndoPointRecorded;
 
     /// <summary>窗口实际 DPI 缩放（WPF DIP ↔ 物理像素换算基准）。</summary>
     private double _scale;
@@ -112,6 +113,14 @@ public sealed partial class CaptureWindow : Window
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        {
+            if (e.Key == Key.Z)
+                UndoAnnotations();
+            else if (e.Key == Key.Y || (e.Key == Key.Z && (Keyboard.Modifiers & ModifierKeys.Shift) != 0))
+                RedoAnnotations();
+            return;
+        }
         if (e.Key == Key.Enter)
             Complete();
         else if (e.Key == Key.Escape)
@@ -184,6 +193,7 @@ public sealed partial class CaptureWindow : Window
         {
             if (_annotations.TrySelectAt(ToRelative(p), 6))
             {
+                _dragUndoPointRecorded = false; // 点击选中：移动发生时（MouseMove）才记录撤销点
                 _draggingAnnotation = true;
                 _dragLast = p;
                 RootGrid.CaptureMouse();
@@ -223,6 +233,11 @@ public sealed partial class CaptureWindow : Window
         }
         if (_draggingAnnotation)
         {
+            if (!_dragUndoPointRecorded)
+            {
+                _annotations.PushUndoPoint(); // 每次拖拽手势只记录一次撤销点
+                _dragUndoPointRecorded = true;
+            }
             _annotations.MoveSelectedBy(new Vector(p.X - _dragLast.X, p.Y - _dragLast.Y));
             _dragLast = p;
             RenderAnnotations();
@@ -355,6 +370,8 @@ public sealed partial class CaptureWindow : Window
         var preview = _tool.GetPreview();
         if (preview != null)
             AnnotationCanvas.Children.Add(AnnotationElement(preview));
+
+        UpdateUndoButtons(); // 渲染同时刷新撤销/重做按钮状态
     }
 
     private void RenderLiveDrawing() => RenderAnnotations();
@@ -476,6 +493,33 @@ public sealed partial class CaptureWindow : Window
     {
         _annotations.Clear();
         RenderAnnotations();
+    }
+
+    private void Undo_OnClick(object sender, RoutedEventArgs e) => UndoAnnotations();
+
+    private void Redo_OnClick(object sender, RoutedEventArgs e) => RedoAnnotations();
+
+    /// <summary>执行撤销并刷新标注与按钮状态。</summary>
+    private void UndoAnnotations()
+    {
+        _annotations.Undo();
+        RenderAnnotations();
+        UpdateUndoButtons();
+    }
+
+    /// <summary>执行重做并刷新标注与按钮状态。</summary>
+    private void RedoAnnotations()
+    {
+        _annotations.Redo();
+        RenderAnnotations();
+        UpdateUndoButtons();
+    }
+
+    /// <summary>按历史栈状态刷新撤销/重做按钮可用性。</summary>
+    private void UpdateUndoButtons()
+    {
+        BtnUndo.IsEnabled = _annotations.CanUndo;
+        BtnRedo.IsEnabled = _annotations.CanRedo;
     }
 
     private void CancelBtn_OnClick(object sender, RoutedEventArgs e) => Cancel();

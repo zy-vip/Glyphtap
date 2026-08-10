@@ -32,6 +32,8 @@
                 <Button x:Name="BtnMedium" Content="中" Tag="3" Click="Thickness_OnClick" Margin="2,0" />
                 <Button x:Name="BtnThick" Content="粗" Tag="5" Click="Thickness_OnClick" Margin="2,0" />
                 <Separator Width="1" Background="Gray" Margin="6,2" />
+                <Button x:Name="BtnUndo" Content="↶" Click="Undo_OnClick" Margin="2,0" IsEnabled="False" ToolTip="撤销 (Ctrl+Z)" />
+                <Button x:Name="BtnRedo" Content="↷" Click="Redo_OnClick" Margin="2,0" IsEnabled="False" ToolTip="重做 (Ctrl+Y)" />
                 <Button x:Name="BtnClear" Content="清除" Click="Clear_OnClick" Margin="2,0" />
                 <Button x:Name="BtnCancel" Content="✗" Click="CancelBtn_OnClick" Margin="2,0" />
                 <Button x:Name="BtnDone" Content="✓" Click="DoneBtn_OnClick" Margin="2,0" FontWeight="Bold" />
