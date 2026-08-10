@@ -22,6 +22,8 @@ public static class AnnotationToolFactory
         AnnotationKind.Ellipse => new EllipseTool(color, thickness),
         AnnotationKind.Arrow => new ArrowTool(color, thickness),
         AnnotationKind.Pen => new PenTool(color, thickness),
+        AnnotationKind.Highlight => new HighlightTool(color, thickness),
+        AnnotationKind.Mosaic => new MosaicTool(color, thickness),
         _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 }
@@ -153,5 +155,29 @@ internal sealed class PenTool : ToolBase
         foreach (var p in _points)
             pen.AddPoint(p);
         return pen;
+    }
+}
+
+internal sealed class HighlightTool : ToolBase
+{
+    public HighlightTool(Color color, double thickness) : base(color, thickness) { }
+    public override AnnotationKind Kind => AnnotationKind.Highlight;
+
+    protected override Annotation? BuildAnnotation(bool isPreview)
+    {
+        var r = Normalize(Start, Last);
+        return r.Width < 1 || r.Height < 1 ? null : new HighlightAnnotation { Rect = r, Color = Color, Thickness = Thickness };
+    }
+}
+
+internal sealed class MosaicTool : ToolBase
+{
+    public MosaicTool(Color color, double thickness) : base(color, thickness) { }
+    public override AnnotationKind Kind => AnnotationKind.Mosaic;
+
+    protected override Annotation? BuildAnnotation(bool isPreview)
+    {
+        var r = Normalize(Start, Last);
+        return r.Width < 1 || r.Height < 1 ? null : new MosaicAnnotation { Rect = r, BlockSize = 8 };
     }
 }

@@ -135,6 +135,10 @@ public sealed class AnnotationManager
                 return r.Rect.Contains(p) || DistanceToRectEdges(p, r.Rect) <= tolerance;
             case EllipseAnnotation e:
                 return DistanceToEllipse(p, e.Rect) <= tolerance;
+            case HighlightAnnotation h:
+                return h.Rect.Contains(p) || DistanceToRectEdges(p, h.Rect) <= tolerance;
+            case MosaicAnnotation m:
+                return m.Rect.Contains(p) || DistanceToRectEdges(p, m.Rect) <= tolerance;
             case ArrowAnnotation ar:
                 return DistanceToSegment(p, ar.Start, ar.End) <= tolerance;
             case PenAnnotation pen:

@@ -3,7 +3,7 @@ using System.Windows.Media;
 
 namespace Glyphtap.Capture;
 
-public enum AnnotationKind { Rectangle, Ellipse, Arrow, Pen }
+public enum AnnotationKind { Rectangle, Ellipse, Arrow, Pen, Highlight, Mosaic }
 
 /// <summary>标注基类。坐标相对选区（物理像素）。</summary>
 public abstract class Annotation
@@ -81,4 +81,32 @@ public sealed class PenAnnotation : Annotation
         copy.Points.AddRange(Points);
         return copy;
     }
+}
+
+/// <summary>高亮标注：半透明色块（无描边，粗细不参与渲染）。</summary>
+public sealed class HighlightAnnotation : Annotation
+{
+    public Rect Rect;
+    public HighlightAnnotation() { Kind = AnnotationKind.Highlight; }
+    public override Rect Bounds => Rect;
+    public override void Offset(Vector delta) => Rect.Offset(delta);
+    public override void Resize(Rect newBounds) => Rect = newBounds;
+    public override Annotation Clone() =>
+        new HighlightAnnotation { Rect = Rect, Color = Color, Thickness = Thickness };
+}
+
+/// <summary>马赛克标注：矩形区域像素块化（无描边，粗细/颜色不参与渲染）。</summary>
+public sealed class MosaicAnnotation : Annotation
+{
+    public Rect Rect;
+
+    /// <summary>马赛克块大小（物理像素）。</summary>
+    public double BlockSize = 8;
+
+    public MosaicAnnotation() { Kind = AnnotationKind.Mosaic; }
+    public override Rect Bounds => Rect;
+    public override void Offset(Vector delta) => Rect.Offset(delta);
+    public override void Resize(Rect newBounds) => Rect = newBounds;
+    public override Annotation Clone() =>
+        new MosaicAnnotation { Rect = Rect, BlockSize = BlockSize, Color = Color, Thickness = Thickness };
 }
