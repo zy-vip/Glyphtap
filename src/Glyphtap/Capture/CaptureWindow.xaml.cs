@@ -31,6 +31,9 @@ public sealed partial class CaptureWindow : Window
     /// <summary>窗口实际 DPI 缩放（WPF DIP ↔ 物理像素换算基准）。</summary>
     private double _scale;
 
+    /// <summary>缓存背景位图源：马赛克预览与 OCR 识别都要基于它裁剪/像素化。</summary>
+    private readonly BitmapSource _backgroundSource;
+
     public bool IsOpen { get; private set; } = true;
 
     private CaptureWindow(ScreenCaptureResult capture, Action<BitmapSource> onComplete, Action onCancel)
@@ -40,7 +43,9 @@ public sealed partial class CaptureWindow : Window
         _onCancel = onCancel;
 
         InitializeComponent();
-        BackgroundImage.Source = BitmapConvert.ToBitmapSource(capture.Bitmap);
+        // 缓存背景源：马赛克预览与 OCR 识别都要基于它裁剪/像素化
+        _backgroundSource = BitmapConvert.ToBitmapSource(capture.Bitmap);
+        BackgroundImage.Source = _backgroundSource;
 
         var layout = capture.Layout;
         var vb = layout.VirtualBounds;
@@ -125,7 +130,7 @@ public sealed partial class CaptureWindow : Window
             Complete();
         else if (e.Key == Key.Escape)
             Cancel();
-        else if (e.Key >= Key.D1 && e.Key <= Key.D4)
+        else if (e.Key >= Key.D1 && e.Key <= Key.D6)
             SwitchTool((AnnotationKind)((int)AnnotationKind.Rectangle + (e.Key - Key.D1)));
         else if (e.Key == Key.Delete)
         {
@@ -412,6 +417,38 @@ public sealed partial class CaptureWindow : Window
                 Canvas.SetLeft(shape, d.X);
                 Canvas.SetTop(shape, d.Y);
                 return shape;
+            }
+            case HighlightAnnotation h:
+            {
+                var shape = new System.Windows.Shapes.Rectangle
+                {
+                    Fill = new SolidColorBrush(Color.FromArgb(90, h.Color.R, h.Color.G, h.Color.B)),
+                    Width = h.Rect.Width / scale,
+                    Height = h.Rect.Height / scale,
+                };
+                var d = ToWindowDipsRelative(h.Rect.Location);
+                Canvas.SetLeft(shape, d.X);
+                Canvas.SetTop(shape, d.Y);
+                return shape;
+            }
+            case MosaicAnnotation m:
+            {
+                // 把选区相对矩形换算为虚拟屏幕绝对物理像素，与背景源边界求交后像素化，回贴预览
+                var s = _selection.Selection;
+                var abs = new Rect(s.X + m.Rect.X, s.Y + m.Rect.Y, m.Rect.Width, m.Rect.Height);
+                var clip = Rect.Intersect(abs, new Rect(0, 0, _backgroundSource.PixelWidth, _backgroundSource.PixelHeight));
+                var img = new Image { Stretch = Stretch.Fill, IsHitTestVisible = false };
+                if (!clip.IsEmpty)
+                {
+                    img.Source = MosaicPixelator.Pixelate(_backgroundSource, clip, m.BlockSize);
+                    var origin = ToWindowDipsRelative(new Point(clip.X - s.X, clip.Y - s.Y));
+                    Canvas.SetLeft(img, origin.X);
+                    Canvas.SetTop(img, origin.Y);
+                    img.Width = clip.Width / _scale;
+                    img.Height = clip.Height / _scale;
+                }
+                img.Visibility = clip.IsEmpty ? Visibility.Collapsed : Visibility.Visible;
+                return img;
             }
             case ArrowAnnotation ar:
             {
