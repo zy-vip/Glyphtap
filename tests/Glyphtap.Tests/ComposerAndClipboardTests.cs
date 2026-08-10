@@ -86,6 +86,59 @@ public class ComposerAndClipboardTests
     }
 
     [StaFact]
+    public void Compose_马赛克标注_选区像素被块化()
+    {
+        // 背景：左半红右半蓝（4x4，每 2 列一色）
+        var full = new WriteableBitmap(4, 4, 96, 96, PixelFormats.Bgra32, null);
+        var bytes = new byte[4 * 4 * 4];
+        for (var y = 0; y < 4; y++)
+        {
+            for (var x = 0; x < 4; x++)
+            {
+                var c = x < 2 ? Colors.Red : Colors.Blue;
+                var i = (y * 4 + x) * 4;
+                bytes[i] = c.B; bytes[i + 1] = c.G; bytes[i + 2] = c.R; bytes[i + 3] = 255;
+            }
+        }
+        full.WritePixels(new Int32Rect(0, 0, 4, 4), bytes, 4 * 4, 0);
+
+        // 马赛克覆盖中间 2x2 区域：块大小 2 → 块化后整块取像素平均，红蓝混合成紫
+        var mosaic = new MosaicAnnotation { Rect = new Rect(1, 1, 2, 2), BlockSize = 2 };
+        var result = CaptureComposer.Compose(full, new Rect(0, 0, 4, 4), new Annotation[] { mosaic });
+        var outPx = new byte[4 * 4 * 4];
+        result.CopyPixels(outPx, 4 * 4, 0);
+
+        // 马赛克块中心 (2,2) 应为红蓝混合（128, 0, 128 附近）
+        var idx = (2 * 4 + 2) * 4;
+        Assert.True(outPx[idx + 2] > 64 && outPx[idx + 2] < 192, $"R={outPx[idx + 2]}");
+        Assert.Equal(0, outPx[idx + 1]);
+        Assert.True(outPx[idx] > 64 && outPx[idx] < 192, $"B={outPx[idx]}");
+        // 块外 (0,0) 保持纯红
+        var outer = 0;
+        Assert.Equal(255, outPx[outer + 2]);
+        Assert.Equal(0, outPx[outer]);
+    }
+
+    [StaFact]
+    public void Compose_高亮标注_半透明色块叠在背景上()
+    {
+        var full = Solid(Colors.White, 50, 50);
+        var highlight = new HighlightAnnotation
+        {
+            Rect = new Rect(10, 10, 30, 30),
+            Color = Color.FromArgb(255, 0, 120, 255), // 蓝色系
+        };
+        var result = CaptureComposer.Compose(full, new Rect(0, 0, 50, 50), new Annotation[] { highlight });
+        var pixels = new byte[50 * 50 * 4];
+        result.CopyPixels(pixels, 50 * 4, 0);
+        // 高亮中心 (25,25)：白色背景混 35% 蓝色 → 蓝通道显著上升、红通道下降
+        var idx = (25 * 50 + 25) * 4;
+        Assert.True(pixels[idx + 2] < 255, $"R={pixels[idx + 2]}");   // 红被蓝压暗
+        Assert.True(pixels[idx] > pixels[idx + 2], $"B={pixels[idx]}"); // 蓝高于红
+        Assert.True(pixels[idx] > 64, $"B={pixels[idx]}");
+    }
+
+    [StaFact]
     public void EncodePng_产出合法PNG头()
     {
         var png = ClipboardService.EncodePng(Solid(Colors.Green, 8, 8));

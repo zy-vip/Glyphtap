@@ -12,6 +12,13 @@ public static class AnnotationRenderer
         var pen = new Pen(new SolidColorBrush(a.Color), a.Thickness) { LineJoin = PenLineJoin.Round };
         switch (a)
         {
+            case HighlightAnnotation h:
+                // 高亮：固定 35% 不透明度色块，无描边
+                dc.DrawRectangle(
+                    new SolidColorBrush(Color.FromArgb(90, h.Color.R, h.Color.G, h.Color.B)),
+                    null,
+                    h.Rect);
+                break;
             case RectangleAnnotation r:
                 dc.DrawRectangle(null, pen, r.Rect);
                 break;

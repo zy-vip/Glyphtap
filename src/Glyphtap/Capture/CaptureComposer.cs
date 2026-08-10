@@ -30,14 +30,41 @@ public static class CaptureComposer
                 fullScreen.PixelWidth,
                 fullScreen.PixelHeight));
 
-            // 标注（相对选区坐标），超界部分被 PushClip 裁掉
+            // 标注（相对选区坐标），超界部分被 PushClip 裁掉；马赛克需先覆盖背景再画其他标注
             foreach (var a in annotations)
+            {
+                if (a is MosaicAnnotation m)
+                {
+                    DrawMosaic(dc, fullScreen, selectionPhysical, m);
+                    continue;
+                }
                 AnnotationRenderer.Draw(dc, a);
+            }
 
             dc.Pop();
         }
 
         rtb.Render(dv);
         return rtb;
+    }
+
+    /// <summary>把马赛克区域块化后覆盖到背景上（区域换算为虚拟屏幕绝对物理像素）。</summary>
+    private static void DrawMosaic(DrawingContext dc, BitmapSource fullScreen, Rect selectionPhysical, MosaicAnnotation m)
+    {
+        var abs = new Rect(
+            selectionPhysical.X + m.Rect.X,
+            selectionPhysical.Y + m.Rect.Y,
+            m.Rect.Width,
+            m.Rect.Height);
+        // 与源图边界求交：防止越界区域导致 CroppedBitmap 抛异常
+        var clip = Rect.Intersect(abs, new Rect(0, 0, fullScreen.PixelWidth, fullScreen.PixelHeight));
+        if (clip.IsEmpty)
+            return;
+        var blocky = MosaicPixelator.Pixelate(fullScreen, clip, m.BlockSize);
+        dc.DrawImage(blocky, new Rect(
+            clip.X - selectionPhysical.X,
+            clip.Y - selectionPhysical.Y,
+            clip.Width,
+            clip.Height));
     }
 }
