@@ -28,6 +28,8 @@ public sealed class CompositeTextRecognizer : ITextRecognizer
             }
             catch (Exception ex)
             {
+                if (ex is OperationCanceledException)
+                    throw; // 取消立即传播，不继续识别器链
                 last = ex; // 记录后尝试下一个识别器
             }
         }

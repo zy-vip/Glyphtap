@@ -32,12 +32,12 @@ public sealed class AnnotationManager
         _undoStack.Push(Snapshot());
         if (_undoStack.Count > MaxUndoDepth)
         {
-            // 丢弃最旧快照（栈底；Stack 只提供 Pop 栈顶，故重建列表后移除首元素）
+            // 丢弃最旧快照（Stack.ToList() 枚举栈顶在前，故移除列表尾元素；逆序重推保持栈顶=最新）
             var all = _undoStack.ToList();
-            all.RemoveAt(0);
+            all.RemoveAt(all.Count - 1);
             _undoStack.Clear();
-            foreach (var s in all)
-                _undoStack.Push(s);
+            for (var i = all.Count - 1; i >= 0; i--)
+                _undoStack.Push(all[i]);
         }
         _redoStack.Clear();
     }

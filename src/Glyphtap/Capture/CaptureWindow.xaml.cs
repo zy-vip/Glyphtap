@@ -128,10 +128,16 @@ public sealed partial class CaptureWindow : Window
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
         {
             if (e.Key == Key.Z)
+            {
                 UndoAnnotations();
+                e.Handled = true;
+            }
             else if (e.Key == Key.Y || (e.Key == Key.Z && (Keyboard.Modifiers & ModifierKeys.Shift) != 0))
+            {
                 RedoAnnotations();
-            return;
+                e.Handled = true;
+            }
+            // 其他 Ctrl 组合键不拦截，放行走下方既有分支（如 Ctrl+Enter 完成截图）
         }
         if (e.Key == Key.Enter)
             Complete();

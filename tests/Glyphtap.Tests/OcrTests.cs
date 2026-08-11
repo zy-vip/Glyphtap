@@ -112,6 +112,26 @@ public class OcrTests
     }
 
     [Fact]
+    public async Task Composite_首个抛OperationCanceledException_立即传播不继续链()
+    {
+        var calls = 0;
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var chain = new CompositeTextRecognizer(new ITextRecognizer[]
+        {
+            new FakeRecognizer((_, _) =>
+            {
+                calls++;
+                throw new OperationCanceledException(cts.Token);
+            }),
+            new FakeRecognizer((_, _) => throw new Exception("不应被调用")),
+        });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() => chain.RecognizeAsync(null!, cts.Token));
+        Assert.Equal(1, calls); // 取消立即传播：不再尝试链中下一个识别器
+    }
+
+    [Fact]
     public async Task Composite_空链_抛InvalidOperationException()
     {
         var chain = new CompositeTextRecognizer(Array.Empty<ITextRecognizer>());

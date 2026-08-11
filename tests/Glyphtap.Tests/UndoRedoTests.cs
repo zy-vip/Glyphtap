@@ -124,6 +124,75 @@ public class UndoRedoTests
         Assert.Null(mgr.Selected);
     }
 
+    [StaFact]
+    public void PushUndoPoint_超过上限_最新快照保留且旧快照被裁剪()
+    {
+        var mgr = new AnnotationManager();
+        mgr.PushUndoPoint(); // 第 1 次推点：空状态（对应拖拽手势开始的推点）
+        for (var i = 1; i <= 100; i++)
+            mgr.Add(Rect(i * 10, 0, 10, 10)); // 第 2..101 次推点（Add 自动推）
+        Assert.Equal(100, mgr.Items.Count);
+
+        mgr.Undo(); // 第一步只回退一个动作：撤销后 = 第 99 次 Add 之后的状态（99 个标注），而非被清空
+        Assert.Equal(99, mgr.Items.Count);
+        Assert.Equal(990, ((RectangleAnnotation)mgr.Items[^1]).Rect.X); // 最后一个 = R99
+        Assert.True(mgr.CanUndo);
+
+        for (var i = 0; i < 98; i++)
+            mgr.Undo();
+        Assert.Single(mgr.Items); // 栈内恰好 100 个撤销点：98 次后仅剩最旧的 1 个
+        Assert.True(mgr.CanUndo);
+
+        mgr.Undo(); // 第 100 次 Undo 恰好回到空列表
+        Assert.Empty(mgr.Items);
+        Assert.False(mgr.CanUndo);
+
+        mgr.Undo(); // 无可撤销项：空操作
+        Assert.Empty(mgr.Items);
+    }
+
+    [StaFact]
+    public void 空列表时_Clear不推撤销点()
+    {
+        var mgr = new AnnotationManager();
+        mgr.Clear();
+        Assert.False(mgr.CanUndo);
+    }
+
+    [StaFact]
+    public void 无选中时_DeleteSelected不推撤销点()
+    {
+        var mgr = new AnnotationManager();
+        mgr.Add(Rect(0, 0, 10, 10));
+        mgr.Undo(); // 撤销 Add，回到空且无历史
+        Assert.False(mgr.CanUndo);
+
+        mgr.DeleteSelected(); // 无选中：不推点、不改变列表
+        Assert.False(mgr.CanUndo);
+        Assert.Empty(mgr.Items);
+    }
+
+    [StaFact]
+    public void 拖拽多次移动_只记录一个撤销点()
+    {
+        var mgr = new AnnotationManager();
+        mgr.Add(Rect(10, 10, 40, 40)); // 撤销点 1
+        mgr.TrySelectAt(new Point(30, 30), 5);
+
+        mgr.PushUndoPoint(); // 拖拽手势开始：撤销点 2
+        mgr.MoveSelectedBy(new Vector(5, 0));
+        mgr.MoveSelectedBy(new Vector(5, 0));
+        Assert.Equal(new Rect(20, 10, 40, 40), ((RectangleAnnotation)mgr.Items[0]).Rect);
+
+        mgr.Undo(); // 一次撤销回到拖拽前位置
+        Assert.Equal(new Rect(10, 10, 40, 40), ((RectangleAnnotation)mgr.Items[0]).Rect);
+        Assert.True(mgr.CanUndo); // 多次移动只记了一个点：Add 的撤销点仍在
+
+        mgr.Undo(); // 撤销 Add
+        Assert.Empty(mgr.Items);
+        Assert.False(mgr.CanUndo);
+    }
+
     [Fact]
     public void Clone_画笔深拷贝_互不影响()
     {
