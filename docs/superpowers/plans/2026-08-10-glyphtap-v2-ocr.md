@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **实施状态（2026-08-11）：** 已全部完成并合并至 master（提交 d4a8998 / 6e6bbb8 / aac838b / 1ab107b / ceb3a61，含多显示器负偏移坐标修复）；自动测试 68/68 通过。除带「待用户执行」注记的手动验证清单外，其余步骤均已勾选。
+
 **Goal:** 在截图窗口内提供「识别」按钮：对当前选区做本地 OCR（Windows.Media.Ocr 离线引擎），结果浮窗展示识别文本行，支持一键复制全文到剪贴板；识别器接入链式组合（`CompositeTextRecognizer`），为未来云端识别器预留扩展点。
 
 **Architecture:** 实现 `ITextRecognizer` 的 `WindowsOcrRecognizer`：`BitmapSource` → PNG 内存流 → `BitmapDecoder` → `SoftwareBitmap` → `OcrEngine.RecognizeAsync`；引擎不可用时抛 `NotSupportedException`（中文提示）。`CompositeTextRecognizer` 按注入的顺序逐个尝试，前面识别器抛异常则换下一个，全部失败抛出最后一个异常——V2 注册链为 `[WindowsOcrRecognizer]`，未来云端实现加入链尾即可。UI 在 `CaptureWindow`：工具栏「识别」按钮点击 → 用 `_backgroundSource`（高亮/马赛克计划已添加的字段）+ 选区物理像素裁剪 → 异步识别 → 结果浮窗显示；「复制文本」复用已有 `ClipboardService.SetText`。
@@ -36,7 +38,7 @@
     - 行为：引擎不可用（`TryCreateFromUserProfileLanguages` 返回 null）→ 抛 `NotSupportedException("系统不支持 OCR（需 Windows 10 1607 及以上，且系统语言包含可识别语言）")`；识别结果按行输出 `TextLine`
     - 内部：`BitmapSource → SoftwareBitmap` 转换（PNG 编码内存流 → `BitmapDecoder.CreateAsync` → `GetSoftwareBitmapAsync`）；超过 `MaxImageDimension` 时预缩放，识别后坐标乘以还原系数还原到原图尺寸
 
-- [ ] **Step 1: 写失败测试（含引擎可用性分支）**
+- [x] **Step 1: 写失败测试（含引擎可用性分支）**
 
 `tests/Glyphtap.Tests/OcrTests.cs`：
 
@@ -86,12 +88,12 @@ public class OcrTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj --filter WindowsOcr`
 Expected: FAIL（编译失败：`WindowsOcrRecognizer` 不存在）
 
-- [ ] **Step 3: 实现 WindowsOcrRecognizer**
+- [x] **Step 3: 实现 WindowsOcrRecognizer**
 
 `src/Glyphtap/OCR/WindowsOcrRecognizer.cs`（新建）：
 
@@ -186,7 +188,7 @@ public sealed class WindowsOcrRecognizer : ITextRecognizer
 > - `float`/`uint` 处理：`OcrEngine.MaxImageDimension` 是静态 `uint` 属性，`word.BoundingRect` 是 `Windows.Foundation.Rect`（`float` 字段，隐式转 double 参与运算即可）；`OcrLine` 本身无 `BoundingRect` 属性，行级矩形需用 `line.Words` 的 `BoundingRect` 做 `Rect.Union` 合并
 > - `BitmapAlphaMode.Premultiplied` 匹配 WPF `Pbgra32` 的已知转换路径，避免颜色异常
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 0 error 0 warning
@@ -194,7 +196,7 @@ Expected: 0 error 0 warning
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj --filter WindowsOcr`
 Expected: PASS（1 个 StaFact）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/Glyphtap/OCR/WindowsOcrRecognizer.cs tests/Glyphtap.Tests/OcrTests.cs
@@ -218,7 +220,7 @@ git commit -m "feat: WindowsOcrRecognizer（WinRT 离线引擎 + 超限预缩放
     - 行为：按顺序尝试链中识别器；某识别器抛异常则记录并尝试下一个；**识别返回空列表视为成功**（不再继续链）；全部失败抛最后一个异常；链为空时立即抛 `InvalidOperationException`
     - 语义：V2 注册 `new CompositeTextRecognizer(new ITextRecognizer[] { new WindowsOcrRecognizer() })`（UI 任务中给出）
 
-- [ ] **Step 1: 追加失败测试**
+- [x] **Step 1: 追加失败测试**
 
 `tests/Glyphtap.Tests/OcrTests.cs` 追加：
 
@@ -300,12 +302,12 @@ public async Task Composite_空链_抛InvalidOperationException()
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj --filter Composite`
 Expected: FAIL（编译失败：`CompositeTextRecognizer` 不存在）
 
-- [ ] **Step 3: 实现 CompositeTextRecognizer**
+- [x] **Step 3: 实现 CompositeTextRecognizer**
 
 `src/Glyphtap/OCR/CompositeTextRecognizer.cs`（新建）：
 
@@ -348,7 +350,7 @@ public sealed class CompositeTextRecognizer : ITextRecognizer
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [x] **Step 4: 运行测试确认通过**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 0 error 0 warning
@@ -356,7 +358,7 @@ Expected: 0 error 0 warning
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj`
 Expected: 全部通过（新增 6 个测试，其中 1 个 StaFact）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/Glyphtap/OCR/CompositeTextRecognizer.cs tests/Glyphtap.Tests/OcrTests.cs
@@ -379,7 +381,7 @@ git commit -m "feat: CompositeTextRecognizer 识别器链（云端预留扩展�
   - 行为：识别按钮点击 → 用 `_backgroundSource` + `_selection.Selection` 做 `CroppedBitmap`（物理像素）→ 识别 → `OcrResultText` 显示逐行文本（0 行显示「未识别到文字」）；识别期间按钮禁用防重入；异常显示「识别失败：<消息>」；复制 = `ClipboardService.SetText(全文)` 后隐藏浮窗；关闭仅隐藏浮窗
   - `CaptureWindow` 需新增 using：`using Glyphtap.OCR;`（`System.Windows.Media.Imaging` 已有）
 
-- [ ] **Step 1: XAML 加识别按钮与结果浮窗**
+- [x] **Step 1: XAML 加识别按钮与结果浮窗**
 
 `src/Glyphtap/Capture/CaptureWindow.xaml`：
 
@@ -419,7 +421,7 @@ git commit -m "feat: CompositeTextRecognizer 识别器链（云端预留扩展�
 
 > 浮窗 `VerticalAlignment=Bottom` + `Margin=0,0,0,64` 使其悬浮在工具栏上方（工具栏底边距 16 + 工具栏高度约 32 + 余量）。`IsHitTestVisible` 继承 Border 默认值 true，浮窗上的按钮可点击。
 
-- [ ] **Step 2: 实现识别流程**
+- [x] **Step 2: 实现识别流程**
 
 `src/Glyphtap/Capture/CaptureWindow.xaml.cs`：
 
@@ -512,7 +514,7 @@ private void OcrClose_OnClick(object sender, RoutedEventArgs e)
 
 > 注：`ClipboardService` 来自 `Glyphtap.Services`，文件已有 `using Glyphtap.Services;`。`OcrCopy_OnClick` 对「识别失败：…」文案也允许复制（用户可能想复制错误信息），仅拦截「未识别到文字」与空文案。
 
-- [ ] **Step 3: 构建并全量跑测试**
+- [x] **Step 3: 构建并全量跑测试**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 0 error 0 warning
@@ -520,7 +522,7 @@ Expected: 0 error 0 warning
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj`
 Expected: 全部通过（56 + 6 = 62 个）
 
-- [ ] **Step 4: 手动验证清单（运行 `dotnet run --project src/Glyphtap`）**
+- [ ] **Step 4: 手动验证清单（运行 `dotnet run --project src/Glyphtap`）**（待用户执行：实现完成时无 GUI 环境，需带显示环境人工过 7 条）
 
 1. 屏幕上打开一段文字（浏览器/记事本均可）→ F1 → 框选文字 → 点「识别」→ 浮窗出现识别文本，与原文字基本一致
 2. 点「复制文本」→ 粘贴到记事本 → 内容正确；浮窗自动关闭
@@ -530,7 +532,7 @@ Expected: 全部通过（56 + 6 = 62 个）
 6. 浮窗打开时「关闭」→ 浮窗隐藏，可再次点「识别」重新识别
 7. 机器无 OCR 引擎时点「识别」→ 浮窗显示「识别失败：系统不支持 OCR（…）」，无异常崩溃
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/Glyphtap/Capture/CaptureWindow.xaml src/Glyphtap/Capture/CaptureWindow.xaml.cs

@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **实施状态（2026-08-11）：** 已全部完成并合并至 master（提交 0e11a7d / 78142ab / 5d8c2a5）；自动测试 68/68 通过。除带「待用户执行」注记的手动验证清单外，其余步骤均已勾选。
+
 **Goal:** 新增两种标注工具：高亮（半透明色块，用户选择的色板色）与马赛克（矩形区域像素块化，块大小固定 8px），支持绘制、选中删除、随选区整体拖动，并正确合成进最终截图。
 
 **Architecture:** 与既有工具相同的扩展路径：`AnnotationKind` 增加 `Highlight`/`Mosaic` → `AnnotationModel.cs` 新增两个标注类（实现 `Clone()`，依赖撤销/重做计划）→ `AnnotationTools.cs` 新增两个 `ToolBase` 子类并扩展工厂 → `AnnotationManager.HitTest` 加两个分支 → 渲染两路：合成路径 `CaptureComposer` 与预览路径 `CaptureWindow.AnnotationElement`。马赛克的本质是「对背景位图的矩形区域做像素块化」，因此新建纯逻辑静态类 `MosaicPixelator`（裁剪 → 缩到块粒度 → NearestNeighbor 放大回原尺寸），合成与预览共用同一实现，保证所见即所得。高亮在 `AnnotationRenderer.Draw` 中作为半透明填充矩形渲染。
@@ -38,7 +40,7 @@
   - `AnnotationKind` 枚举顺序：`Rectangle, Ellipse, Arrow, Pen, Highlight, Mosaic`（顺序决定数字键 1~6 映射，见 Task 3）
   - `HighlightTool` / `MosaicTool`：均为矩形拖拽协议，尺寸小于 1px 时 `End()` 返回 null（与 `RectangleTool` 一致）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/Glyphtap.Tests/HighlightMosaicTests.cs`：
 
@@ -118,12 +120,12 @@ public class HighlightMosaicTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj`
 Expected: FAIL（编译失败：`HighlightAnnotation` / `MosaicAnnotation` / `AnnotationKind.Highlight` 不存在；`Clone` 若撤销计划未执行也会编译失败）
 
-- [ ] **Step 3: 扩展模型**
+- [x] **Step 3: 扩展模型**
 
 `src/Glyphtap/Capture/AnnotationModel.cs`：
 
@@ -165,7 +167,7 @@ public sealed class MosaicAnnotation : Annotation
 }
 ```
 
-- [ ] **Step 4: 扩展工具工厂与工具类**
+- [x] **Step 4: 扩展工具工厂与工具类**
 
 `src/Glyphtap/Capture/AnnotationTools.cs`：
 
@@ -204,7 +206,7 @@ internal sealed class MosaicTool : ToolBase
 }
 ```
 
-- [ ] **Step 5: 扩展命中测试**
+- [x] **Step 5: 扩展命中测试**
 
 `src/Glyphtap/Capture/AnnotationManager.cs` 的 `HitTest` switch，在 `case EllipseAnnotation e:` 分支之后追加（矩形类命中逻辑与 `RectangleAnnotation` 相同）：
 
@@ -215,12 +217,12 @@ case MosaicAnnotation m:
     return m.Rect.Contains(p) || DistanceToRectEdges(p, m.Rect) <= tolerance;
 ```
 
-- [ ] **Step 6: 运行测试确认通过**
+- [x] **Step 6: 运行测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj`
 Expected: 全部通过（既有 48 个 + 新增 6 个）
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/Glyphtap/Capture/AnnotationModel.cs src/Glyphtap/Capture/AnnotationTools.cs src/Glyphtap/Capture/AnnotationManager.cs tests/Glyphtap.Tests/HighlightMosaicTests.cs
@@ -244,7 +246,7 @@ git commit -m "feat: 高亮与马赛克标注的模型/工具/命中测试"
     - 算法：`CroppedBitmap` 裁剪 → `RenderTargetBitmap` 缩放到约 (w/block × h/block) → 同样手法以 `NearestNeighbor` 放大回原尺寸（硬像素块，无模糊）
 - `CaptureComposer.Compose` 新行为：`MosaicAnnotation` 不再进入 `AnnotationRenderer.Draw`，而是在背景绘制完成后立即覆盖（把马赛克区域换算为虚拟屏幕绝对物理像素，与源图边界求交后调用 `MosaicPixelator.Pixelate`，再以相对选区坐标 `DrawImage` 回画）
 
-- [ ] **Step 1: 结构设计说明（确保马赛克区域不越界）**
+- [x] **Step 1: 结构设计说明（确保马赛克区域不越界）**
 
 马赛克区域 = `selectionPhysical.X + m.Rect.X, selectionPhysical.Y + m.Rect.Y`（宽高 = `m.Rect.Width/Height`）。该区域可能超出虚拟屏幕（选区贴着屏幕边缘时标注可部分越界）。`CroppedBitmap` 要求裁剪矩形完全落在源图内，因此须先用 `Rect.Intersect` 与源图边界求交：
 
@@ -254,7 +256,7 @@ var clip = Rect.Intersect(absRect, new Rect(0, 0, source.PixelWidth, source.Pixe
 
 交集为空时跳过该马赛克（屏幕外无内容可块化）。交集非空时按交集像素化，回画位置同样用交集（相对选区 = `clip.X - selectionPhysical.X`）。
 
-- [ ] **Step 2: 写失败测试**
+- [x] **Step 2: 写失败测试**
 
 `tests/Glyphtap.Tests/ComposerAndClipboardTests.cs` 追加：
 
@@ -315,7 +317,7 @@ public void Compose_高亮标注_半透明色块叠在背景上()
 
 > 说明：高亮渲染 alpha 固定 90/255 ≈ 35%（渲染实现见 Step 3 的 `AnnotationRenderer` 分支），因此断言「蓝通道 > 红通道且红被压暗」验证叠加效果；精确混合值与反走样（边缘）无关，取区域中心像素避免边缘。
 
-- [ ] **Step 3: 实现 MosaicPixelator**
+- [x] **Step 3: 实现 MosaicPixelator**
 
 `src/Glyphtap/Capture/MosaicPixelator.cs`（新建）：
 
@@ -362,7 +364,7 @@ public static class MosaicPixelator
 }
 ```
 
-- [ ] **Step 4: 修改 CaptureComposer**
+- [x] **Step 4: 修改 CaptureComposer**
 
 `src/Glyphtap/Capture/CaptureComposer.cs`，把标注循环改为（当前第 33-35 行）：
 
@@ -403,7 +405,7 @@ private static void DrawMosaic(DrawingContext dc, BitmapSource fullScreen, Rect 
 }
 ```
 
-- [ ] **Step 5: 高亮渲染分支（AnnotationRenderer）**
+- [x] **Step 5: 高亮渲染分支（AnnotationRenderer）**
 
 `src/Glyphtap/Capture/AnnotationRenderer.cs` 的 `Draw` switch，在 `case RectangleAnnotation r:` 之前追加：
 
@@ -417,7 +419,7 @@ case HighlightAnnotation h:
     break;
 ```
 
-- [ ] **Step 6: 运行测试确认通过**
+- [x] **Step 6: 运行测试确认通过**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 0 error 0 warning
@@ -425,7 +427,7 @@ Expected: 0 error 0 warning
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj`
 Expected: 全部通过（新增 2 个 StaFact 测试）
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/Glyphtap/Capture/MosaicPixelator.cs src/Glyphtap/Capture/CaptureComposer.cs src/Glyphtap/Capture/AnnotationRenderer.cs tests/Glyphtap.Tests/ComposerAndClipboardTests.cs
@@ -447,7 +449,7 @@ git commit -m "feat: 马赛克像素化渲染与高亮合成（MosaicPixelator/C
   - XAML：`BtnHighlight`（Content="高亮" Tag="Highlight" Click="Tool_OnClick"）、`BtnMosaic`（Content="马赛克" Tag="Mosaic" Click="Tool_OnClick"），置于「画笔」按钮之后、色板分隔线之前
   - 数字键：`Key.D1`~`Key.D6` 映射 `AnnotationKind.Rectangle`~`Mosaic`（枚举顺序已在 Task 1 固定）
 
-- [ ] **Step 1: XAML 加按钮**
+- [x] **Step 1: XAML 加按钮**
 
 `src/Glyphtap/Capture/CaptureWindow.xaml`，在 `<Button x:Name="BtnPen" .../>` 之后插入：
 
@@ -456,7 +458,7 @@ git commit -m "feat: 马赛克像素化渲染与高亮合成（MosaicPixelator/C
 <Button x:Name="BtnMosaic" Content="马赛克" Tag="Mosaic" Click="Tool_OnClick" Margin="2,0" />
 ```
 
-- [ ] **Step 2: 缓存背景位图源**
+- [x] **Step 2: 缓存背景位图源**
 
 `src/Glyphtap/Capture/CaptureWindow.xaml.cs`，构造中把现有两行：
 
@@ -478,7 +480,7 @@ BackgroundImage.Source = _backgroundSource;
 private readonly BitmapSource _backgroundSource;
 ```
 
-- [ ] **Step 3: 数字键扩到 6**
+- [x] **Step 3: 数字键扩到 6**
 
 `OnPreviewKeyDown`（Task A2 后该函数顶部已有 Ctrl 分支，保留）：
 
@@ -489,7 +491,7 @@ else if (e.Key >= Key.D1 && e.Key <= Key.D6)
 
 > 数字键与枚举顺序对齐：1=矩形 2=椭圆 3=箭头 4=画笔 5=高亮 6=马赛克。
 
-- [ ] **Step 4: AnnotationElement 增加两个分支**
+- [x] **Step 4: AnnotationElement 增加两个分支**
 
 `src/Glyphtap/Capture/CaptureWindow.xaml.cs` 的 `AnnotationElement` switch，在 `case EllipseAnnotation e:` 分支后追加（需新建文件顶部 `using System.Windows.Media.Imaging;`，若已有则跳过）：
 
@@ -530,7 +532,7 @@ case MosaicAnnotation m:
 
 > 说明：`Image` 控件来自 `System.Windows.Controls`（文件已有该 using）。马赛克预览直接复用 `MosaicPixelator`，与合成输出一致（所见即所得）；像素化成本与选区尺寸相关，块化中间位图很小（约 w/8 × h/8），仅在标注集合/预览变化时重建。
 
-- [ ] **Step 5: 构建并全量跑测试**
+- [x] **Step 5: 构建并全量跑测试**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 0 error 0 warning
@@ -538,7 +540,7 @@ Expected: 0 error 0 warning
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj`
 Expected: 全部通过（56 个）
 
-- [ ] **Step 6: 手动验证清单（运行 `dotnet run --project src/Glyphtap`）**
+- [ ] **Step 6: 手动验证清单（运行 `dotnet run --project src/Glyphtap`）**（待用户执行：实现完成时无 GUI 环境，需带显示环境人工过 7 条）
 
 1. 按 5 或点「高亮」→ 拖拽 → 半透明色块悬于背景上；换色板颜色后高亮跟随
 2. 按 6 或点「马赛克」→ 拖拽 → 实时预览出现硬边像素块；松开后块保持
@@ -548,7 +550,7 @@ Expected: 全部通过（56 个）
 6. 撤销（Ctrl+Z）/重做（Ctrl+Y）对高亮与马赛克生效
 7. 1~6 快捷键全部可切换，工具栏当前工具高亮跟随
 
-- [ ] **Step 7: 提交**
+- [x] **Step 7: 提交**
 
 ```bash
 git add src/Glyphtap/Capture/CaptureWindow.xaml src/Glyphtap/Capture/CaptureWindow.xaml.cs

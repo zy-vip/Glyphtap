@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **实施状态（2026-08-11）：** 已全部完成并合并至 master（提交 7654565 / 7cc45a4 / ceb3a61）；自动测试 68/68 通过。除带「待用户执行」注记的手动验证清单外，其余步骤均已勾选。
+
 **Goal:** 为标注层实现撤销/重做：标注的添加、删除、清除、移动、整体平移均可撤销与重做，快捷键 Ctrl+Z / Ctrl+Y（及 Ctrl+Shift+Z），并提供工具栏按钮。
 
 **Architecture:** 在纯逻辑 `AnnotationManager` 内实现快照式历史栈：每次修改动作前自动推送「当前标注列表深拷贝」到撤销栈，新动作清空重做栈。`Annotation` 基类新增 `Clone()` 抽象方法，各子类实现深拷贝（画笔需复制点列表）。选区本身的创建/移动/缩放不做撤销（超出 MVP 预期，只覆盖标注层）。UI 侧：鼠标拖拽标注移动是连续调用 `MoveSelectedBy`，由 UI 在 MouseMove 首次实际移动时（布尔守卫：纯点击选中不产生撤销点）调用一次 `PushUndoPoint()` 记录起始状态。
@@ -39,7 +41,7 @@
     - 自动记录：`Add` / `DeleteSelected` / `Clear` / `MoveAllBy` 在修改列表前自动调用 `PushUndoPoint()`（无修改时跳过：`DeleteSelected` 无选中、`Clear` 空列表、`MoveAllBy` 空列表时不推点）
   - `MoveSelectedBy` **不**自动记录（连续调用），由 UI 在 MouseMove 首次实际移动时调用一次 `PushUndoPoint()`（见 Task 2）
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 `tests/Glyphtap.Tests/UndoRedoTests.cs`：
 
@@ -199,12 +201,12 @@ public class UndoRedoTests
 }
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj`
 Expected: FAIL（编译错误：`Clone` 未定义）
 
-- [ ] **Step 3: 实现 Clone**
+- [x] **Step 3: 实现 Clone**
 
 在 `src/Glyphtap/Capture/AnnotationModel.cs` 的 `Annotation` 基类中新增抽象方法：
 
@@ -245,7 +247,7 @@ public override Annotation Clone()
 }
 ```
 
-- [ ] **Step 4: 实现 AnnotationManager 历史栈**
+- [x] **Step 4: 实现 AnnotationManager 历史栈**
 
 修改 `src/Glyphtap/Capture/AnnotationManager.cs`：
 
@@ -360,12 +362,12 @@ public void MoveAllBy(Vector delta)
 
 > `MoveSelectedBy` 保持原样（不自动记录）：UI 拖拽期间每帧调用，若自动记录会产生大量无意义快照；由 UI 在 MouseDown 命中标注时调用一次 `PushUndoPoint()`。
 
-- [ ] **Step 5: 运行测试确认通过**
+- [x] **Step 5: 运行测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj`
 Expected: 全部通过（既有 38 个 + 新增 10 个）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/Glyphtap/Capture/AnnotationModel.cs src/Glyphtap/Capture/AnnotationManager.cs tests/Glyphtap.Tests/UndoRedoTests.cs
@@ -386,7 +388,7 @@ git commit -m "feat: 标注撤销/重做（快照历史栈 + Clone 深拷贝）"
   - XAML：`BtnUndo`（Content="↶"）、`BtnRedo`（Content="↷"），Click 分别为 `Undo_OnClick` / `Redo_OnClick`
   - 代码：`private void Undo_OnClick(object sender, RoutedEventArgs e)`、`private void Redo_OnClick(object sender, RoutedEventArgs e)`、`private void UpdateUndoButtons()`（刷新两按钮 IsEnabled）
 
-- [ ] **Step 1: 修改工具栏 XAML**
+- [x] **Step 1: 修改工具栏 XAML**
 
 `src/Glyphtap/Capture/CaptureWindow.xaml`，在 `<Button x:Name="BtnClear" .../>` 之前插入：
 
@@ -396,7 +398,7 @@ git commit -m "feat: 标注撤销/重做（快照历史栈 + Clone 深拷贝）"
 <Button x:Name="BtnRedo" Content="↷" Click="Redo_OnClick" Margin="2,0" IsEnabled="False" ToolTip="重做 (Ctrl+Y)" />
 ```
 
-- [ ] **Step 2: 修改快捷键处理**
+- [x] **Step 2: 修改快捷键处理**
 
 `src/Glyphtap/Capture/CaptureWindow.xaml.cs` 的 `OnPreviewKeyDown`（现第 113 行起），在 `PreviewKeyDown` 开头加入撤销/重做分支（在 Enter/Esc 分支之前）：
 
@@ -417,7 +419,7 @@ private void OnPreviewKeyDown(object sender, KeyEventArgs e)
 
 > 注：`Key.Z` + Shift 的组合在第一个 `if` 内处理（Ctrl+Shift+Z = 重做）。
 
-- [ ] **Step 3: 实现按钮事件与状态刷新**
+- [x] **Step 3: 实现按钮事件与状态刷新**
 
 在 `CaptureWindow.xaml.cs` 的工具栏区域（`Tool_OnClick` 附近）追加：
 
@@ -450,7 +452,7 @@ private void UpdateUndoButtons()
 }
 ```
 
-- [ ] **Step 4: 拖拽标注实际移动时记录撤销点**
+- [x] **Step 4: 拖拽标注实际移动时记录撤销点**
 
 修改 `CaptureWindow.xaml.cs`：`MoveSelectedBy` 不自动记录，纯点击选中（无移动）不应产生撤销点，改为 MouseMove 首次实际移动时用布尔守卫记录一次。
 
@@ -490,7 +492,7 @@ if (_draggingAnnotation)
 }
 ```
 
-- [ ] **Step 5: 操作后刷新按钮状态**
+- [x] **Step 5: 操作后刷新按钮状态**
 
 在 `RenderAnnotations()` 调用处保持一致：在 `RootGrid_MouseUp` 的标注提交分支（`_annotations.Add(a)` 后）与 `_annotations.DeleteSelected()` / `Clear_OnClick` 之后追加 `UpdateUndoButtons();`。
 
@@ -519,7 +521,7 @@ private void RenderAnnotations()
 
 > 说明：撤销/重做按钮为纯 UI 行为，无单元测试可写（托盘/工具栏 UI 只能手动验证，与仓库现有约定一致）。Task 2 的验收 = `dotnet build` 通过 + 手动验证清单（见 Step 7）。
 
-- [ ] **Step 6: 构建并全量跑测试**
+- [x] **Step 6: 构建并全量跑测试**
 
 Run: `dotnet build Glyphtap.sln`
 Expected: 0 error 0 warning
@@ -527,7 +529,7 @@ Expected: 0 error 0 warning
 Run: `dotnet test tests/Glyphtap.Tests/Glyphtap.Tests.csproj`
 Expected: 全部通过（48 个）
 
-- [ ] **Step 7: 手动验证清单（运行 `dotnet run --project src/Glyphtap`）**
+- [ ] **Step 7: 手动验证清单（运行 `dotnet run --project src/Glyphtap`）**（待用户执行：实现完成时无 GUI 环境，需带显示环境人工过 6 条）
 
 1. 画一个矩形标注 → Ctrl+Z 消失 → Ctrl+Y 恢复
 2. 画椭圆 → 追加 Delete 删除 → Ctrl+Z 恢复 → 工具栏「↶」按钮同样可撤销
@@ -536,7 +538,7 @@ Expected: 全部通过（48 个）
 5. 撤销两步后画新标注 → Ctrl+Y 不可用（重做栈被清空）
 6. 无历史时两个按钮灰置
 
-- [ ] **Step 8: 提交**
+- [x] **Step 8: 提交**
 
 ```bash
 git add src/Glyphtap/Capture/CaptureWindow.xaml src/Glyphtap/Capture/CaptureWindow.xaml.cs
