@@ -440,14 +440,17 @@ public sealed partial class CaptureWindow : Window
             }
             case MosaicAnnotation m:
             {
-                // 把选区相对矩形换算为虚拟屏幕绝对物理像素，与背景源边界求交后像素化，回贴预览
+                // 把选区相对矩形换算为虚拟屏幕绝对物理坐标，与背景源边界求交后像素化，回贴预览
                 var s = _selection.Selection;
+                var vb = _capture.Layout.VirtualBounds;
                 var abs = new Rect(s.X + m.Rect.X, s.Y + m.Rect.Y, m.Rect.Width, m.Rect.Height);
-                var clip = Rect.Intersect(abs, new Rect(0, 0, _backgroundSource.PixelWidth, _backgroundSource.PixelHeight));
+                // 位图边界用物理坐标空间表示（原点 = vb 左上角）；Pixelate 的矩形按位图像素坐标理解，需减 vb 转换
+                var clip = Rect.Intersect(abs, new Rect(vb.X, vb.Y, _backgroundSource.PixelWidth, _backgroundSource.PixelHeight));
                 var img = new Image { Stretch = Stretch.Fill, IsHitTestVisible = false };
                 if (!clip.IsEmpty)
                 {
-                    img.Source = MosaicPixelator.Pixelate(_backgroundSource, clip, m.BlockSize);
+                    img.Source = MosaicPixelator.Pixelate(_backgroundSource, new Rect(
+                        clip.X - vb.X, clip.Y - vb.Y, clip.Width, clip.Height), m.BlockSize);
                     var origin = ToWindowDipsRelative(new Point(clip.X - s.X, clip.Y - s.Y));
                     Canvas.SetLeft(img, origin.X);
                     Canvas.SetTop(img, origin.Y);
@@ -548,9 +551,10 @@ public sealed partial class CaptureWindow : Window
         try
         {
             var s = _selection.Selection;
-            // 识别选区原图（不含标注）：背景源 + 选区物理像素裁剪
+            // 识别选区原图（不含标注）：背景源 + 选区物理像素裁剪（裁剪原点按位图像素坐标，需减虚拟屏原点）
+            var vb = _capture.Layout.VirtualBounds;
             var crop = new CroppedBitmap(_backgroundSource, new Int32Rect(
-                (int)s.X, (int)s.Y, (int)s.Width, (int)s.Height));
+                (int)(s.X - vb.X), (int)(s.Y - vb.Y), (int)s.Width, (int)s.Height));
             var lines = await _recognizer.RecognizeAsync(crop, CancellationToken.None);
             OcrResultText.Text = lines.Count == 0
                 ? "未识别到文字"
@@ -574,8 +578,16 @@ public sealed partial class CaptureWindow : Window
         // 复制全文后收起浮窗（空结果时 OcrResultText 为提示文案，不复制）
         if (OcrResultText.Text is "未识别到文字" or null)
             return;
-        ClipboardService.SetText(OcrResultText.Text);
-        OcrPanel.Visibility = Visibility.Collapsed;
+        try
+        {
+            ClipboardService.SetText(OcrResultText.Text);
+            OcrPanel.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            // 剪贴板被占用等异常：提示而非崩溃
+            OcrResultText.Text = "复制失败：" + ex.Message;
+        }
     }
 
     private void OcrClose_OnClick(object sender, RoutedEventArgs e)
@@ -622,10 +634,12 @@ public sealed partial class CaptureWindow : Window
         if (!_selection.HasSelection)
             return;
         IsOpen = false;
+        var vb = _capture.Layout.VirtualBounds;
         var composed = CaptureComposer.Compose(
             BitmapConvert.ToBitmapSource(_capture.Bitmap),
             _selection.Selection,
-            _annotations.Items);
+            _annotations.Items,
+            new Point(vb.X, vb.Y));
         Close();
         _capture.Bitmap.Dispose();
         _onComplete(composed);

@@ -11,7 +11,7 @@ namespace Glyphtap.Capture;
 /// </summary>
 public static class CaptureComposer
 {
-    public static BitmapSource Compose(BitmapSource fullScreen, Rect selectionPhysical, IReadOnlyList<Annotation> annotations)
+    public static BitmapSource Compose(BitmapSource fullScreen, Rect selectionPhysical, IReadOnlyList<Annotation> annotations, Point bitmapOrigin = default)
     {
         var w = (int)Math.Ceiling(selectionPhysical.Width);
         var h = (int)Math.Ceiling(selectionPhysical.Height);
@@ -23,10 +23,10 @@ public static class CaptureComposer
             // 先裁剪到选区矩形，再绘制背景与标注，超界内容不显示
             dc.PushClip(new RectangleGeometry(new Rect(0, 0, w, h)));
 
-            // 背景：把整图平移到选区对齐（选区左上角 → 0,0）
+            // 背景：把整图平移到选区对齐（选区左上角 → 0,0；位图原点在 bitmapOrigin，减掉后才是位图像素位置）
             dc.DrawImage(fullScreen, new Rect(
-                -(selectionPhysical.X),
-                -(selectionPhysical.Y),
+                -(selectionPhysical.X - bitmapOrigin.X),
+                -(selectionPhysical.Y - bitmapOrigin.Y),
                 fullScreen.PixelWidth,
                 fullScreen.PixelHeight));
 
@@ -35,7 +35,7 @@ public static class CaptureComposer
             {
                 if (a is MosaicAnnotation m)
                 {
-                    DrawMosaic(dc, fullScreen, selectionPhysical, m);
+                    DrawMosaic(dc, fullScreen, selectionPhysical, m, bitmapOrigin);
                     continue;
                 }
                 AnnotationRenderer.Draw(dc, a);
@@ -49,18 +49,20 @@ public static class CaptureComposer
     }
 
     /// <summary>把马赛克区域块化后覆盖到背景上（区域换算为虚拟屏幕绝对物理像素）。</summary>
-    private static void DrawMosaic(DrawingContext dc, BitmapSource fullScreen, Rect selectionPhysical, MosaicAnnotation m)
+    private static void DrawMosaic(DrawingContext dc, BitmapSource fullScreen, Rect selectionPhysical, MosaicAnnotation m, Point bitmapOrigin)
     {
         var abs = new Rect(
             selectionPhysical.X + m.Rect.X,
             selectionPhysical.Y + m.Rect.Y,
             m.Rect.Width,
             m.Rect.Height);
-        // 与源图边界求交：防止越界区域导致 CroppedBitmap 抛异常
-        var clip = Rect.Intersect(abs, new Rect(0, 0, fullScreen.PixelWidth, fullScreen.PixelHeight));
+        // 与位图边界求交（位图边界用物理坐标空间表示，原点 = bitmapOrigin）：防止越界区域导致 CroppedBitmap 抛异常
+        var clip = Rect.Intersect(abs, new Rect(bitmapOrigin.X, bitmapOrigin.Y, fullScreen.PixelWidth, fullScreen.PixelHeight));
         if (clip.IsEmpty)
             return;
-        var blocky = MosaicPixelator.Pixelate(fullScreen, clip, m.BlockSize);
+        // Pixelate 的矩形按位图像素坐标理解：物理坐标减位图原点转换；回画位置保持物理坐标相对选区（clip 与 selectionPhysical 同空间）
+        var blocky = MosaicPixelator.Pixelate(fullScreen, new Rect(
+            clip.X - bitmapOrigin.X, clip.Y - bitmapOrigin.Y, clip.Width, clip.Height), m.BlockSize);
         dc.DrawImage(blocky, new Rect(
             clip.X - selectionPhysical.X,
             clip.Y - selectionPhysical.Y,

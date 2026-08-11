@@ -120,6 +120,57 @@ public class ComposerAndClipboardTests
     }
 
     [StaFact]
+    public void Compose_负偏移虚拟屏下背景与马赛克定位正确()
+    {
+        // 背景：左半红右半蓝（4x4，每 2 列一色），位图像素原点位于物理 (-2,0)（模拟副屏在主屏左侧）
+        var full = new WriteableBitmap(4, 4, 96, 96, PixelFormats.Bgra32, null);
+        var bytes = new byte[4 * 4 * 4];
+        for (var y = 0; y < 4; y++)
+        {
+            for (var x = 0; x < 4; x++)
+            {
+                var c = x < 2 ? Colors.Red : Colors.Blue;
+                var i = (y * 4 + x) * 4;
+                bytes[i] = c.B; bytes[i + 1] = c.G; bytes[i + 2] = c.R; bytes[i + 3] = 255;
+            }
+        }
+        full.WritePixels(new Int32Rect(0, 0, 4, 4), bytes, 4 * 4, 0);
+
+        // 推导：位图像素(px,py) = 物理(px-2, py)；选区恰好覆盖整张位图 → 输出(ox,oy) = 位图像素(ox,oy)
+        var origin = new Point(-2, 0);
+        var selection = new Rect(-2, 0, 4, 4);
+
+        // 无标注：输出 (0,0)=位图像素(0,0)=红；(3,0)=位图像素(3,0)=蓝
+        var plain = CaptureComposer.Compose(full, selection, Array.Empty<Annotation>(), origin);
+        var px = new byte[4 * 4 * 4];
+        plain.CopyPixels(px, 4 * 4, 0);
+        Assert.Equal(Colors.Red.B, px[0]);
+        Assert.Equal(Colors.Red.G, px[1]);
+        Assert.Equal(Colors.Red.R, px[2]);
+        var bl = (0 * 4 + 3) * 4;
+        Assert.Equal(Colors.Blue.B, px[bl]);
+        Assert.Equal(Colors.Blue.G, px[bl + 1]);
+        Assert.Equal(Colors.Blue.R, px[bl + 2]);
+
+        // 马赛克 Rect(1,1,2,2) 是选区相对坐标 → 物理 (-1,1,2,2) = 位图像素 (1,1)-(3,3)（2x2 红蓝块）
+        // 块大小 2 → 整块取像素平均成紫 (128,0,128)，回画在输出 (1,1,2,2)
+        var mosaic = new MosaicAnnotation { Rect = new Rect(1, 1, 2, 2), BlockSize = 2 };
+        var result = CaptureComposer.Compose(full, selection, new Annotation[] { mosaic }, origin);
+        var outPx = new byte[4 * 4 * 4];
+        result.CopyPixels(outPx, 4 * 4, 0);
+
+        // 马赛克块中心 (2,2) 应为红蓝混合（128, 0, 128 附近）
+        var idx = (2 * 4 + 2) * 4;
+        Assert.True(outPx[idx + 2] > 64 && outPx[idx + 2] < 192, $"R={outPx[idx + 2]}");
+        Assert.Equal(0, outPx[idx + 1]);
+        Assert.True(outPx[idx] > 64 && outPx[idx] < 192, $"B={outPx[idx]}");
+        // 块外 (0,0) 保持纯红
+        var outer = 0;
+        Assert.Equal(255, outPx[outer + 2]);
+        Assert.Equal(0, outPx[outer]);
+    }
+
+    [StaFact]
     public void Compose_高亮标注_半透明色块叠在背景上()
     {
         var full = Solid(Colors.White, 50, 50);
