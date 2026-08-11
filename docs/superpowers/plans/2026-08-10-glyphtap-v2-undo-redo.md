@@ -67,7 +67,7 @@ public class UndoRedoTests
 
         mgr.Undo();
         Assert.Single(mgr.Items);
-        Assert.Equal(20, ((RectangleAnnotation)mgr.Items[0]).Rect.X);
+        Assert.Equal(0, ((RectangleAnnotation)mgr.Items[0]).Rect.X);
 
         mgr.Undo();
         Assert.Empty(mgr.Items);
@@ -274,18 +274,18 @@ public void PushUndoPoint()
     _undoStack.Push(Snapshot());
     if (_undoStack.Count > MaxUndoDepth)
     {
-        // 丢弃最旧快照（栈底；Stack 只提供 Pop 栈顶，故重建列表后移除首元素）
-        var all = _undoStack.ToList();
-        all.RemoveAt(0);
+        // 丢弃最旧快照（栈底；Stack 只提供 Pop 栈顶，故重建列表后删除列表末尾元素并逆序重推，保持栈顶=最新）
+        var all = _undoStack.ToList(); // ToList 枚举是栈顶在前（[S100..S0]）
+        all.RemoveAt(all.Count - 1);   // 丢弃最旧的 S0
         _undoStack.Clear();
-        foreach (var s in all)
-            _undoStack.Push(s);
+        for (var i = all.Count - 1; i >= 0; i--) // 逆序重推，保持 S1..S100，栈顶=最新
+            _undoStack.Push(all[i]);
     }
     _redoStack.Clear();
 }
 ```
 
-> 说明：`Stack.Pop()` 移除的是栈顶（最新），因此丢弃最旧（栈底）快照需重建列表。快照本身是持久化列表（深拷贝），重建无风险。
+> 说明：`Stack.Pop()` 移除的是栈顶（最新），因此丢弃最旧（栈底）快照需重建列表；注意 `ToList()` 的枚举顺序是栈顶在前，删除末尾元素并逆序重推才不会反转栈序。快照本身是持久化列表（深拷贝），重建无风险。
 
 撤销与重做：
 

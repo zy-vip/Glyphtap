@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- 目标框架：`net8.0-windows`，沿用现有 csproj；`Windows.Media.Ocr` 属于 WinRT API，net8.0-windows 默认包含 Windows SDK 投影。若构建报「类型或命名空间 Windows.Media.Ocr 不存在」，按击 csproj 显式加 `<TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>`（仅此一种情况才改 csproj）
+- 目标框架：`net8.0-windows`，沿用现有 csproj；`Windows.Media.Ocr` 属于 WinRT API，net8.0-windows 默认包含 Windows SDK 投影。若构建报「类型或命名空间 Windows.Media.Ocr 不存在」，改用内联目标框架 `net8.0-windows10.0.19041.0`（SDK 会覆盖显式的 `<TargetPlatformVersion>` 属性，内联 TFM 是实际生效的方式）
 - OCR 输入：选区原图（背景位图裁剪，**不含标注**）；`TextLine.BoundsDips` 以物理像素填充（截图位图无 DPI 元数据，1 物理像素 = 1 DIP）
 - **OcrEngine 的 2600 像素限制**：`OcrEngine.MaxImageDimension` 为 2600，超过会被引擎内部缩放且结果坐标空间不确定——本实现**显式预缩放**：任一边超过 2600 时先等比缩到 2600 内，识别后把 `BoundsDips` 按缩放因子放大回原图坐标（不依赖 `engine.Scale` 的语义）
 - 所有代码注释使用中文；测试方法名使用中文；界面文案使用简体中文
@@ -120,15 +120,18 @@ public sealed class WindowsOcrRecognizer : ITextRecognizer
             throw new NotSupportedException("系统不支持 OCR（需 Windows 10 1607 及以上，且系统语言包含可识别语言）");
 
         // 超过引擎限制时预缩放：工作图坐标 × 还原系数 = 原图坐标
-        var (workImage, restoreFactor) = EnsureWithinLimit(image, engine.MaxImageDimension);
+        var (workImage, restoreFactor) = EnsureWithinLimit(image, OcrEngine.MaxImageDimension);
         using var softwareBitmap = await ToSoftwareBitmapAsync(workImage, ct);
         var result = await engine.RecognizeAsync(softwareBitmap).AsTask(ct);
 
         var lines = new List<TextLine>(result.Lines.Count);
         foreach (var line in result.Lines)
         {
-            // BoundingRect 以工作图（可能已缩小）为坐标系，乘回还原系数得到原图坐标
-            var r = line.BoundingRect;
+            // OcrLine 无整行矩形，用行内所有词的 BoundingRect 合并出行级矩形（以工作图坐标，乘回还原系数得到原图坐标）
+            var lineRect = Rect.Empty;
+            foreach (var word in line.Words)
+                lineRect = Rect.Union(lineRect, word.BoundingRect);
+            var r = lineRect;
             lines.Add(new TextLine(
                 line.Text,
                 new Rect(
@@ -180,7 +183,7 @@ public sealed class WindowsOcrRecognizer : ITextRecognizer
 
 > 说明：
 > - `ms.AsRandomAccessStream()` 扩展方法在 `System.IO.WindowsRuntimeStreamExtensions`（`System.Runtime.InteropServices.WindowsRuntime` 命名空间），net8.0-windows 的 WinRT 互操作自带
-> - `float`/`uint` 处理：`OcrEngine.MaxImageDimension` 是 `uint`，`line.BoundingRect` 是 `Windows.Foundation.Rect`（`float` 字段，隐式转 double 参与运算即可）
+> - `float`/`uint` 处理：`OcrEngine.MaxImageDimension` 是静态 `uint` 属性，`word.BoundingRect` 是 `Windows.Foundation.Rect`（`float` 字段，隐式转 double 参与运算即可）；`OcrLine` 本身无 `BoundingRect` 属性，行级矩形需用 `line.Words` 的 `BoundingRect` 做 `Rect.Union` 合并
 > - `BitmapAlphaMode.Premultiplied` 匹配 WPF `Pbgra32` 的已知转换路径，避免颜色异常
 
 - [ ] **Step 4: 运行测试确认通过**

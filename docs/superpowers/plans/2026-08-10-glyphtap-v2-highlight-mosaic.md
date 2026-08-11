@@ -345,13 +345,13 @@ public static class MosaicPixelator
         return RenderScaled(small, w, h, BitmapScalingMode.NearestNeighbor);
     }
 
-    /// <summary>把 src 渲染到目标尺寸的位图（VisualBrush + RenderTargetBitmap，插值模式可指定）。</summary>
+    /// <summary>把 src 渲染到目标尺寸的位图（ImageBrush + RenderTargetBitmap，插值模式可指定）。</summary>
     private static BitmapSource RenderScaled(BitmapSource src, int w, int h, BitmapScalingMode mode)
     {
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())
         {
-            var brush = new VisualBrush(src) { Stretch = Stretch.Fill };
+            var brush = new ImageBrush(src) { Stretch = Stretch.Fill };
             RenderOptions.SetBitmapScalingMode(brush, mode);
             dc.DrawRectangle(brush, null, new Rect(0, 0, w, h));
         }
