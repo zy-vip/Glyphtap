@@ -31,7 +31,7 @@
 - Consumes: 现有 `Annotation` 抽象（`Kind/Color/Thickness/Bounds/Offset/Resize/Clone`）
 - Produces: `TextAnnotation`（`Text/Position/TextSize`）、`TextMetrics.FontSizeForThickness(double)→double`、`TextMetrics.Measure(string,double)→Size`、Text 分支渲染与命中
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```csharp
 // tests/Glyphtap.Tests/TextAnnotationTests.cs
@@ -118,11 +118,11 @@ public class TextAnnotationTests
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `dotnet test tests/Glyphtap.Tests --filter "FullyQualifiedName~TextAnnotationTests"`（现有测试须保持 68/68 全绿；新测试因缺类型编译失败属预期）
 
-- [ ] **Step 3: 实现模型与测量**
+- [x] **Step 3: 实现模型与测量**
 
 `AnnotationModel.cs`：枚举后追加 `Text` 并新增类：
 
@@ -217,11 +217,11 @@ case TextAnnotation t:
 
 （`using System.Globalization;` 与 `using System.Windows.Media;` 已存在于各自文件，确认顶部 using 完整。）
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `dotnet test tests/Glyphtap.Tests`，预期：68 存量 + 新增全部通过（含 `[StaFact]` 测量用例）
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add tests/Glyphtap.Tests/TextAnnotationTests.cs src/Glyphtap/Capture/AnnotationModel.cs src/Glyphtap/Capture/AnnotationTools.cs src/Glyphtap/Capture/AnnotationRenderer.cs src/Glyphtap/Capture/AnnotationManager.cs
@@ -240,7 +240,7 @@ git commit -m "feat: 文本标注模型/测量/渲染/命中（TextAnnotation + 
 - Consumes: Task 1 的 `TextAnnotation`/`TextMetrics`/`NoOpTool`
 - Produces: 无新公开接口（纯 UI 交互）
 
-- [ ] **Step 1: 先改 XAML 加按钮**
+- [x] **Step 1: 先改 XAML 加按钮**
 
 `CaptureWindow.xaml` 在 `BtnMosaic` 按钮后追加：
 
@@ -250,7 +250,7 @@ git commit -m "feat: 文本标注模型/测量/渲染/命中（TextAnnotation + 
 
 （`Tool_OnClick` 现有实现已按 Tag 解析枚举，无需改动。）
 
-- [ ] **Step 2: 改快捷键范围 D1~D7**
+- [x] **Step 2: 改快捷键范围 D1~D7**
 
 `CaptureWindow.xaml.cs` 的 `OnPreviewKeyDown` 中：
 
@@ -260,7 +260,7 @@ else if (e.Key >= Key.D1 && e.Key <= Key.D7)
     SwitchTool((AnnotationKind)((int)AnnotationKind.Rectangle + (e.Key - Key.D1)));
 ```
 
-- [ ] **Step 3: SwitchTool/颜色/粗细处理器支持 Text（绕过工厂）**
+- [x] **Step 3: SwitchTool/颜色/粗细处理器支持 Text（绕过工厂）**
 
 ```csharp
 private void SwitchTool(AnnotationKind kind)
@@ -284,7 +284,7 @@ private void Thickness_OnClick(object sender, RoutedEventArgs e)
 }
 ```
 
-- [ ] **Step 4: 内联输入编辑态字段与方法**
+- [x] **Step 4: 内联输入编辑态字段与方法**
 
 字段区追加：
 
@@ -431,11 +431,11 @@ case TextAnnotation t:
 }
 ```
 
-- [ ] **Step 5: 全量测试 + 构建**
+- [x] **Step 5: 全量测试 + 构建**
 
 Run: `dotnet build Glyphtap.sln`; `dotnet test tests/Glyphtap.Tests`（存量 68 + 新增测试全绿）
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/Glyphtap/Capture/CaptureWindow.xaml src/Glyphtap/Capture/CaptureWindow.xaml.cs
