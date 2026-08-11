@@ -22,6 +22,7 @@
                 <Button x:Name="BtnPen" Content="画笔" Tag="Pen" Click="Tool_OnClick" Margin="2,0" />
                 <Button x:Name="BtnHighlight" Content="高亮" Tag="Highlight" Click="Tool_OnClick" Margin="2,0" />
                 <Button x:Name="BtnMosaic" Content="马赛克" Tag="Mosaic" Click="Tool_OnClick" Margin="2,0" />
+                <Button x:Name="BtnText" Content="文本" Tag="Text" Click="Tool_OnClick" Margin="2,0" />
                 <Separator Width="1" Background="Gray" Margin="6,2" />
                 <Button x:Name="BtnRed" Content="" Background="#FF3B30" Tag="#FFFF3B30" Click="Color_OnClick" Margin="2,0" Width="18" Height="18" />
                 <Button x:Name="BtnYellow" Content="" Background="#FFCC00" Tag="#FFFFCC00" Click="Color_OnClick" Margin="2,0" Width="18" Height="18" />

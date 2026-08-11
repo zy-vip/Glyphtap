@@ -29,6 +29,10 @@ public sealed partial class CaptureWindow : Window
     private Point _dragLast;
     private bool _dragUndoPointRecorded;
 
+    private bool _textEditing;
+    private TextBox? _editBox;
+    private Point _editPosRel; // 文本起点，选区相对物理像素
+
     /// <summary>窗口实际 DPI 缩放（WPF DIP ↔ 物理像素换算基准）。</summary>
     private double _scale;
 
@@ -125,6 +129,22 @@ public sealed partial class CaptureWindow : Window
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (_textEditing && e.OriginalSource is TextBox)
+        {
+            if (e.Key == Key.Enter)
+            {
+                CommitTextEdit();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Escape)
+            {
+                CancelTextEdit();
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Delete)
+                e.Handled = true; // 输入框内删除不清标注
+            return; // Ctrl+Z 等在 TextBox 内原生处理，不触发全局撤销
+        }
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
         {
             if (e.Key == Key.Z)
@@ -143,7 +163,7 @@ public sealed partial class CaptureWindow : Window
             Complete();
         else if (e.Key == Key.Escape)
             Cancel();
-        else if (e.Key >= Key.D1 && e.Key <= Key.D6)
+        else if (e.Key >= Key.D1 && e.Key <= Key.D7)
             SwitchTool((AnnotationKind)((int)AnnotationKind.Rectangle + (e.Key - Key.D1)));
         else if (e.Key == Key.Delete)
         {
@@ -209,6 +229,8 @@ public sealed partial class CaptureWindow : Window
         // 已有选区：先命中标注 → 选中并移动；否则交给选区逻辑（手柄/移动/重新创建）
         if (_selection.HasSelection)
         {
+            if (_textEditing)
+                return; // 编辑中：点击空白交给失焦提交，不启动新手势
             if (_annotations.TrySelectAt(ToRelative(p), 6))
             {
                 _dragUndoPointRecorded = false; // 点击选中：移动发生时（MouseMove）才记录撤销点
@@ -219,6 +241,11 @@ public sealed partial class CaptureWindow : Window
             }
             // 点在选区内且未命中标注，进入绘制模式
             var handle = SelectionLogic.HitTestHandle(p, _selection.Selection);
+            if (handle == ResizeHandle.None && _selection.Selection.Contains(p) && _currentKind == AnnotationKind.Text)
+            {
+                BeginTextEdit(ToRelative(p));
+                return;
+            }
             if (handle == ResizeHandle.None && _selection.Selection.Contains(p))
             {
                 _tool.Begin(ToRelative(p));
@@ -241,6 +268,7 @@ public sealed partial class CaptureWindow : Window
 
     private void RootGrid_MouseMove(object sender, MouseEventArgs e)
     {
+        if (_textEditing) return; // 编辑中不进入选区/标注手势
         var p = ToPhysical(e.GetPosition(this));
 
         if (_tool.IsDrawing)
@@ -268,6 +296,7 @@ public sealed partial class CaptureWindow : Window
 
     private void RootGrid_MouseUp(object sender, MouseButtonEventArgs e)
     {
+        if (_textEditing) return; // 编辑中不进入选区/标注手势
         if (_tool.IsDrawing)
         {
             var a = _tool.End();
@@ -367,6 +396,59 @@ public sealed partial class CaptureWindow : Window
         Canvas.SetTop(_maskParts[index], d.Y);
         _maskParts[index].Width = Math.Max(0, w / _scale);
         _maskParts[index].Height = Math.Max(0, h / _scale);
+    }
+
+    // ---- 文本标注：内联输入 ----
+
+    private void BeginTextEdit(Point rel)
+    {
+        _textEditing = true;
+        _editPosRel = rel;
+        var d = ToWindowDipsRelative(rel);
+        _editBox = new TextBox
+        {
+            Width = 240,
+            FontFamily = new FontFamily(TextMetrics.FontFamilyName),
+            FontSize = TextMetrics.FontSizeForThickness(_thickness) / _scale,
+            Foreground = new SolidColorBrush(_color),
+            Background = new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)),
+            AcceptsReturn = false,
+        };
+        Canvas.SetLeft(_editBox, d.X);
+        Canvas.SetTop(_editBox, d.Y);
+        // AnnotationCanvas 命中关闭（IsHitTestVisible=False），TextBox 须挂到 OverlayCanvas
+        OverlayCanvas.Children.Add(_editBox);
+        _editBox.Focus();
+        // 失焦提交与 Enter 提交共用路径，CommitTextEdit 开头 _textEditing 判空防二次提交
+        _editBox.LostKeyboardFocus += (_, _) => CommitTextEdit();
+    }
+
+    /// <summary>提交文本：Enter/失焦。空文本不创建标注。</summary>
+    private void CommitTextEdit()
+    {
+        if (!_textEditing)
+            return;
+        _textEditing = false;
+        var text = _editBox!.Text.Trim();
+        OverlayCanvas.Children.Remove(_editBox);
+        _editBox = null;
+        if (text.Length == 0)
+            return;
+        var fs = TextMetrics.FontSizeForThickness(_thickness);
+        var size = TextMetrics.Measure(text, fs);
+        var a = new TextAnnotation { Text = text, Position = _editPosRel, TextSize = size, Color = _color, Thickness = _thickness };
+        _annotations.Add(a); // Add 自动记录撤销点
+        RenderAnnotations();
+        Focus(); // 恢复窗口焦点，保证 Enter 继续走完成截图等快捷键
+    }
+
+    private void CancelTextEdit()
+    {
+        if (!_textEditing)
+            return;
+        _textEditing = false;
+        OverlayCanvas.Children.Remove(_editBox);
+        _editBox = null;
     }
 
     // ---- 标注渲染 ----
@@ -511,6 +593,21 @@ public sealed partial class CaptureWindow : Window
                 Canvas.SetTop(poly, origin.Y);
                 return poly;
             }
+            case TextAnnotation t:
+            {
+                var tb = new TextBlock
+                {
+                    Text = t.Text,
+                    FontFamily = new FontFamily(TextMetrics.FontFamilyName),
+                    FontSize = TextMetrics.FontSizeForThickness(t.Thickness) / scale,
+                    Foreground = new SolidColorBrush(a.Color),
+                    IsHitTestVisible = false,
+                };
+                var td = ToWindowDipsRelative(t.Position);
+                Canvas.SetLeft(tb, td.X);
+                Canvas.SetTop(tb, td.Y);
+                return tb;
+            }
             default:
                 throw new ArgumentOutOfRangeException();
         }
@@ -521,7 +618,9 @@ public sealed partial class CaptureWindow : Window
     private void SwitchTool(AnnotationKind kind)
     {
         _currentKind = kind;
-        _tool = AnnotationToolFactory.Create(_currentKind, _color, _thickness);
+        _tool = kind == AnnotationKind.Text
+            ? NoOpTool.Instance
+            : AnnotationToolFactory.Create(kind, _color, _thickness);
     }
 
     private void Tool_OnClick(object sender, RoutedEventArgs e)
@@ -533,13 +632,13 @@ public sealed partial class CaptureWindow : Window
     private void Color_OnClick(object sender, RoutedEventArgs e)
     {
         _color = (Color)ColorConverter.ConvertFromString(((FrameworkElement)sender).Tag!.ToString()!)!;
-        _tool = AnnotationToolFactory.Create(_currentKind, _color, _thickness);
+        SwitchTool(_currentKind); // 原为直接调工厂，Text 时保持 NoOp
     }
 
     private void Thickness_OnClick(object sender, RoutedEventArgs e)
     {
         _thickness = double.Parse(((FrameworkElement)sender).Tag!.ToString()!);
-        _tool = AnnotationToolFactory.Create(_currentKind, _color, _thickness);
+        SwitchTool(_currentKind);
     }
 
     private void Clear_OnClick(object sender, RoutedEventArgs e)
