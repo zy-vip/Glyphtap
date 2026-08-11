@@ -4,6 +4,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using Glyphtap.OCR;
 using Glyphtap.Services;
 
 namespace Glyphtap.Capture;
@@ -33,6 +34,12 @@ public sealed partial class CaptureWindow : Window
 
     /// <summary>缓存背景位图源：马赛克预览与 OCR 识别都要基于它裁剪/像素化。</summary>
     private readonly BitmapSource _backgroundSource;
+
+    /// <summary>OCR 识别器链：本地优先，云端实现未来加入链尾。</summary>
+    private readonly ITextRecognizer _recognizer = new CompositeTextRecognizer(
+        new ITextRecognizer[] { new WindowsOcrRecognizer() });
+
+    private bool _ocrRunning;
 
     public bool IsOpen { get; private set; } = true;
 
@@ -184,8 +191,8 @@ public sealed partial class CaptureWindow : Window
         if (e.ChangedButton != MouseButton.Left)
             return;
 
-        // 工具栏按钮点击会冒泡到此，忽略以保护工具栏交互
-        if (Toolbar.Visibility == Visibility.Visible && IsInToolbar(e.OriginalSource))
+        // 浮层（工具栏 / OCR 结果浮窗）按钮点击不进入截图交互
+        if (IsInFloatingUi(e.OriginalSource))
             return;
 
         var p = ToPhysical(e.GetPosition(this));
@@ -276,12 +283,12 @@ public sealed partial class CaptureWindow : Window
         UpdateSelectionVisual();
     }
 
-    /// <summary>判断事件源是否位于工具栏控件树内。</summary>
-    private bool IsInToolbar(object source)
+    /// <summary>判断事件源是否位于浮层（工具栏 / OCR 结果浮窗）控件树内。</summary>
+    private bool IsInFloatingUi(object source)
     {
         for (var d = source as DependencyObject; d != null; d = VisualTreeHelper.GetParent(d))
         {
-            if (d == Toolbar)
+            if (d == Toolbar || d == OcrPanel)
                 return true;
         }
         return false;
@@ -530,6 +537,50 @@ public sealed partial class CaptureWindow : Window
     {
         _annotations.Clear();
         RenderAnnotations();
+    }
+
+    private async void Ocr_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_ocrRunning || !_selection.HasSelection)
+            return;
+        _ocrRunning = true;
+        BtnOcr.IsEnabled = false;
+        try
+        {
+            var s = _selection.Selection;
+            // 识别选区原图（不含标注）：背景源 + 选区物理像素裁剪
+            var crop = new CroppedBitmap(_backgroundSource, new Int32Rect(
+                (int)s.X, (int)s.Y, (int)s.Width, (int)s.Height));
+            var lines = await _recognizer.RecognizeAsync(crop, CancellationToken.None);
+            OcrResultText.Text = lines.Count == 0
+                ? "未识别到文字"
+                : string.Join("\n", lines.Select(l => l.Text));
+            OcrPanel.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex)
+        {
+            OcrResultText.Text = "识别失败：" + ex.Message;
+            OcrPanel.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            _ocrRunning = false;
+            BtnOcr.IsEnabled = true;
+        }
+    }
+
+    private void OcrCopy_OnClick(object sender, RoutedEventArgs e)
+    {
+        // 复制全文后收起浮窗（空结果时 OcrResultText 为提示文案，不复制）
+        if (OcrResultText.Text is "未识别到文字" or null)
+            return;
+        ClipboardService.SetText(OcrResultText.Text);
+        OcrPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void OcrClose_OnClick(object sender, RoutedEventArgs e)
+    {
+        OcrPanel.Visibility = Visibility.Collapsed;
     }
 
     private void Undo_OnClick(object sender, RoutedEventArgs e) => UndoAnnotations();
