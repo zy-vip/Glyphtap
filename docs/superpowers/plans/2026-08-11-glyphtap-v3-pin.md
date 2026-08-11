@@ -554,8 +554,8 @@ public sealed class PinWindow : Window
             copy.Click += (_, _) => Safe(() => ClipboardService.SetText(_text ?? ""));
             menu.Items.Add(copy);
         }
-        var top = new MenuItem { Header = "置顶" };
-        top.Click += (_, _) => Topmost = !Topmost;
+        var top = new MenuItem { Header = "置顶", IsChecked = Topmost };
+        top.Click += (_, _) => { Topmost = !Topmost; top.IsChecked = Topmost; };
         var close = new MenuItem { Header = "销毁贴图" };
         close.Click += (_, _) => Close();
         menu.Items.Add(top);
@@ -785,6 +785,7 @@ public sealed class PinManager
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using Glyphtap.Services;
 
 namespace Glyphtap.Settings;

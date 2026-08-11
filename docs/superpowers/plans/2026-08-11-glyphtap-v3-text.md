@@ -362,6 +362,7 @@ private void CommitTextEdit()
     var a = new TextAnnotation { Text = text, Position = _editPosRel, TextSize = size, Color = _color, Thickness = _thickness };
     _annotations.Add(a); // Add 自动记录撤销点
     RenderAnnotations();
+    Focus(); // 恢复窗口焦点，保证 Enter 继续走完成截图等快捷键
 }
 
 private void CancelTextEdit()
@@ -432,7 +433,7 @@ case TextAnnotation t:
 
 - [ ] **Step 5: 全量测试 + 构建**
 
-Run: `dotnet build Glyphtap.sln`; `dotnet test tests/Glyphtap.Tests`（78 项全绿）
+Run: `dotnet build Glyphtap.sln`; `dotnet test tests/Glyphtap.Tests`（存量 68 + 新增测试全绿）
 
 - [ ] **Step 6: 提交**
 
