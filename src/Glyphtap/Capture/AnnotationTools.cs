@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 
@@ -180,4 +181,45 @@ internal sealed class MosaicTool : ToolBase
         var r = Normalize(Start, Last);
         return r.Width < 1 || r.Height < 1 ? null : new MosaicAnnotation { Rect = r, BlockSize = 8 };
     }
+}
+
+/// <summary>文本测量与字号映射。测量单位物理像素（pixelsPerDip=1.0）。</summary>
+public static class TextMetrics
+{
+    public const string FontFamilyName = "Microsoft YaHei";
+
+    /// <summary>粗细档 → 字号（物理像素）：细12 / 中16 / 粗20。</summary>
+    public static double FontSizeForThickness(double thickness) => thickness switch
+    {
+        <= 1.5 => 12,
+        <= 4 => 16,
+        _ => 20,
+    };
+
+    /// <summary>按物理像素字号测量文本宽度高度。需 STA。</summary>
+    public static Size Measure(string text, double fontSizePx)
+    {
+        if (text.Length == 0)
+            return new Size(0, 0);
+        var ft = new FormattedText(text,
+            CultureInfo.CurrentUICulture,
+            FlowDirection.LeftToRight,
+            new Typeface(FontFamilyName),
+            fontSizePx,
+            Brushes.Black,
+            pixelsPerDip: 1.0);
+        return new Size(ft.WidthIncludingTrailingWhitespace, ft.Height);
+    }
+}
+
+/// <summary>文本工具占位：点按语义不进工厂，令其无绘制行为。</summary>
+internal sealed class NoOpTool : IAnnotationTool
+{
+    public static readonly NoOpTool Instance = new();
+    public AnnotationKind Kind => AnnotationKind.Text;
+    public bool IsDrawing => false;
+    public void Begin(Point p) { }
+    public void Move(Point p) { }
+    public Annotation? GetPreview() => null;
+    public Annotation? End() => null;
 }

@@ -3,7 +3,7 @@ using System.Windows.Media;
 
 namespace Glyphtap.Capture;
 
-public enum AnnotationKind { Rectangle, Ellipse, Arrow, Pen, Highlight, Mosaic }
+public enum AnnotationKind { Rectangle, Ellipse, Arrow, Pen, Highlight, Mosaic, Text }
 
 /// <summary>标注基类。坐标相对选区（物理像素）。</summary>
 public abstract class Annotation
@@ -109,4 +109,20 @@ public sealed class MosaicAnnotation : Annotation
     public override void Resize(Rect newBounds) => Rect = newBounds;
     public override Annotation Clone() =>
         new MosaicAnnotation { Rect = Rect, BlockSize = BlockSize, Color = Color, Thickness = Thickness };
+}
+
+/// <summary>文本标注：TextSize 在提交时由 TextMetrics 测量一次并缓存（避免重复 STA 测量）。坐标相对选区物理像素。</summary>
+public sealed class TextAnnotation : Annotation
+{
+    public string Text = "";
+    public Point Position;
+    public Size TextSize;
+
+    public TextAnnotation() { Kind = AnnotationKind.Text; }
+
+    public override Rect Bounds => new(Position, TextSize);
+    public override void Offset(Vector delta) => Position += delta;
+    public override void Resize(Rect newBounds) { /* 文本不缩放（同箭头/画笔惯例） */ }
+    public override Annotation Clone() =>
+        new TextAnnotation { Text = Text, Position = Position, TextSize = TextSize, Color = Color, Thickness = Thickness };
 }

@@ -148,6 +148,11 @@ public sealed class AnnotationManager
                         return true;
                 }
                 return false;
+            case TextAnnotation t:
+            {
+                var r = new Rect(t.Position, t.TextSize);
+                return r.Contains(p) || DistanceToRectEdges(p, r) <= tolerance;
+            }
             default:
                 return false;
         }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -55,6 +56,15 @@ public static class AnnotationRenderer
                 dc.DrawGeometry(null, pen, geo);
                 break;
             }
+            case TextAnnotation t:
+                dc.DrawText(new FormattedText(t.Text,
+                        CultureInfo.CurrentUICulture,
+                        FlowDirection.LeftToRight,
+                        new Typeface(TextMetrics.FontFamilyName),
+                        TextMetrics.FontSizeForThickness(t.Thickness),
+                        new SolidColorBrush(t.Color),
+                        pixelsPerDip: 1.0), t.Position);
+                break;
         }
     }
 }
