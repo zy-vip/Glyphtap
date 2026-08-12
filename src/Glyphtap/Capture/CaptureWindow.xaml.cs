@@ -131,6 +131,8 @@ public sealed partial class CaptureWindow : Window
     {
         if (_textEditing && e.OriginalSource is TextBox)
         {
+            if (e.ImeProcessedKey != Key.None)
+                return; // 输入法组词确认（Enter）/取消（Esc）交给输入法，不提交不取消
             if (e.Key == Key.Enter)
             {
                 CommitTextEdit();
@@ -141,8 +143,7 @@ public sealed partial class CaptureWindow : Window
                 CancelTextEdit();
                 e.Handled = true;
             }
-            else if (e.Key == Key.Delete)
-                e.Handled = true; // 输入框内删除不清标注
+            // Delete 不拦截：编辑分支的 return 已挡住下方全局删除分支，输入框内删除需保持可用
             return; // Ctrl+Z 等在 TextBox 内原生处理，不触发全局撤销
         }
         if ((Keyboard.Modifiers & ModifierKeys.Control) != 0)
@@ -230,7 +231,12 @@ public sealed partial class CaptureWindow : Window
         if (_selection.HasSelection)
         {
             if (_textEditing)
-                return; // 编辑中：点击空白交给失焦提交，不启动新手势
+            {
+                // 点击编辑框外：窗口 Focus() 强制移焦 → LostKeyboardFocus → 提交；点框内不提交，便于移动光标
+                if (!IsDescendantOf(e.OriginalSource, _editBox))
+                    Focus();
+                return;
+            }
             if (_annotations.TrySelectAt(ToRelative(p), 6))
             {
                 _dragUndoPointRecorded = false; // 点击选中：移动发生时（MouseMove）才记录撤销点
@@ -329,6 +335,17 @@ public sealed partial class CaptureWindow : Window
         return false;
     }
 
+    /// <summary>判断元素是否位于目标控件的可视子树内（含自身）。</summary>
+    private static bool IsDescendantOf(object? element, DependencyObject? target)
+    {
+        for (var d = element as DependencyObject; d != null; d = VisualTreeHelper.GetParent(d))
+        {
+            if (d == target)
+                return true;
+        }
+        return false;
+    }
+
     // ---- 选区与遮罩渲染 ----
 
     private void UpdateSelectionVisual()
@@ -412,6 +429,7 @@ public sealed partial class CaptureWindow : Window
             FontSize = TextMetrics.FontSizeForThickness(_thickness) / _scale,
             Foreground = new SolidColorBrush(_color),
             Background = new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)),
+            Padding = new Thickness(0), // 默认内边距约 2px，清零保证与提交后 TextBlock 渲染位置一致
             AcceptsReturn = false,
         };
         Canvas.SetLeft(_editBox, d.X);
@@ -420,11 +438,11 @@ public sealed partial class CaptureWindow : Window
         OverlayCanvas.Children.Add(_editBox);
         _editBox.Focus();
         // 失焦提交与 Enter 提交共用路径，CommitTextEdit 开头 _textEditing 判空防二次提交
-        _editBox.LostKeyboardFocus += (_, _) => CommitTextEdit();
+        _editBox.LostKeyboardFocus += (_, _) => CommitTextEdit(restoreFocus: false);
     }
 
-    /// <summary>提交文本：Enter/失焦。空文本不创建标注。</summary>
-    private void CommitTextEdit()
+    /// <summary>提交文本：Enter/失焦。空文本不创建标注。restoreFocus=false 用于失焦路径，避免把激活从用户点击处抢回。</summary>
+    private void CommitTextEdit(bool restoreFocus = true)
     {
         if (!_textEditing)
             return;
@@ -439,7 +457,8 @@ public sealed partial class CaptureWindow : Window
         var a = new TextAnnotation { Text = text, Position = _editPosRel, TextSize = size, Color = _color, Thickness = _thickness };
         _annotations.Add(a); // Add 自动记录撤销点
         RenderAnnotations();
-        Focus(); // 恢复窗口焦点，保证 Enter 继续走完成截图等快捷键
+        if (restoreFocus)
+            Focus(); // 恢复窗口焦点，保证 Enter 继续走完成截图等快捷键
     }
 
     private void CancelTextEdit()

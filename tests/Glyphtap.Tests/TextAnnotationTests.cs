@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Glyphtap.Capture;
 using Xunit;
 
@@ -14,6 +15,15 @@ public class TextAnnotationTests
         Assert.Equal(12, TextMetrics.FontSizeForThickness(1));
         Assert.Equal(16, TextMetrics.FontSizeForThickness(3));
         Assert.Equal(20, TextMetrics.FontSizeForThickness(5));
+    }
+
+    [Fact]
+    public void 字号映射_边界值取档正确()
+    {
+        Assert.Equal(12, TextMetrics.FontSizeForThickness(0));
+        Assert.Equal(12, TextMetrics.FontSizeForThickness(1.5));
+        Assert.Equal(16, TextMetrics.FontSizeForThickness(4));
+        Assert.Equal(20, TextMetrics.FontSizeForThickness(4.1));
     }
 
     [StaFact]
@@ -30,7 +40,7 @@ public class TextAnnotationTests
     }
 
     [Fact]
-    public void 文本标注_静态属性与文本框尺寸()
+    public void 文本标注_静态属性与Bounds组成()
     {
         var t = new TextAnnotation { Text = "你好", Position = new Point(10, 20), TextSize = new Size(50, 20), Color = Colors.Red, Thickness = 3 };
         Assert.Equal(AnnotationKind.Text, t.Kind);
@@ -64,6 +74,52 @@ public class TextAnnotationTests
         var t = new TextAnnotation { Text = "x", Position = new Point(0, 0), TextSize = new Size(50, 20) };
         Assert.True(AnnotationManager.HitTest(t, new Point(10, 10), 5));
         Assert.False(AnnotationManager.HitTest(t, new Point(100, 100), 5));
+    }
+
+    [Fact]
+    public void 文本命中_容差内边缘命中_容差外不命中()
+    {
+        var t = new TextAnnotation { Text = "x", Position = new Point(0, 0), TextSize = new Size(50, 20) };
+        // 框右缘 x=50，右侧 4px 在容差 5 内
+        Assert.True(AnnotationManager.HitTest(t, new Point(54, 10), 5));
+        // 右侧 10px 超出容差
+        Assert.False(AnnotationManager.HitTest(t, new Point(60, 10), 5));
+    }
+
+    [StaFact]
+    public void Compose_文本标注_文字像素绘制在背景上()
+    {
+        // 100x100 白底
+        var bmp = new WriteableBitmap(100, 100, 96, 96, PixelFormats.Bgra32, null);
+        var bytes = new byte[100 * 100 * 4];
+        for (var i = 0; i < bytes.Length; i += 4)
+        {
+            bytes[i] = 255; bytes[i + 1] = 255; bytes[i + 2] = 255; bytes[i + 3] = 255;
+        }
+        bmp.WritePixels(new Int32Rect(0, 0, 100, 100), bytes, 100 * 4, 0);
+
+        var text = new TextAnnotation { Text = "测试", Position = new Point(10, 10), TextSize = new Size(50, 20), Color = Colors.Red, Thickness = 3 };
+        var result = CaptureComposer.Compose(bmp, new Rect(0, 0, 100, 100), new Annotation[] { text });
+        var px = new byte[100 * 100 * 4];
+        result.CopyPixels(px, 100 * 4, 0);
+
+        // 文本框区域内应出现红色笔画（R 高、B 低）
+        var redFound = false;
+        for (var y = 10; y < 40; y++)
+        {
+            for (var x = 10; x < 70; x++)
+            {
+                var i = (y * 100 + x) * 4;
+                if (px[i + 2] > 200 && px[i] < 100)
+                {
+                    redFound = true;
+                    break;
+                }
+            }
+            if (redFound)
+                break;
+        }
+        Assert.True(redFound);
     }
 
     [Fact]
